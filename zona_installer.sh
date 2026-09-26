@@ -328,17 +328,23 @@ mkdir_if_absent "$DRIVE_C/mo2/mods"
 mkdir_if_absent "$DRIVE_C/anomaly"
 #FIXME mkdir_if_absent "$HOME/Games/zona/"
 if [ -d "$HOME/Games/zona/mo2_folder" ]; then
-  echo "Symlink to $DRIVE_C/mo2 exists, skipping."
-else
-  echo "Making symbolic link to $DRIVE_C/mo2 ..."
-  ln -s $DRIVE_C/mo2 $HOME/Games/zona/mo2_folder
+  echo "Removing old symlink mo2_folder..."
+  rm "$HOME/Games/zona/mo2_folder"
 fi
 if [ -d "$HOME/Games/zona/anomaly_folder" ]; then
-  echo "Symlink to $DRIVE_C/anomaly exists, skipping."
-else
-  echo "Making symbolic link to $DRIVE_C/anomaly ..."
-  ln -s $DRIVE_C/anomaly $HOME/Games/zona/anomaly_folder
+  echo "Removing old symlink anomaly_folder..."
+  rm "$HOME/Games/zona/anomaly_folder"
 fi
+if [ -d "$HOME/Games/zona/virtual_home" ]; then
+  echo "Removing old symlink virtual_home..."
+  rm "$HOME/Games/zona/virtual_home"
+fi
+echo "Making symbolic link to $CONTY_HOME ..."
+ln -s "$CONTY_HOME" "$HOME/Games/zona/virtual_home"
+echo "Making symbolic link to $DRIVE_C/mo2 ..."
+ln -s "$DRIVE_C/mo2" "$HOME/Games/zona/mo2_folder"
+echo "Making symbolic link to $DRIVE_C/anomaly ..."
+ln -s "$DRIVE_C/anomaly" "$HOME/Games/zona/anomaly_folder"
 
 section_change "EXTRACTING FILES"
 
@@ -392,6 +398,8 @@ HOME_DIR=$CONTY_HOME WINEPREFIX=$CONTY_VIRTUAL_PREFIX $CONTY winetricks cmd d3dc
 
 echo
 echo "Zona installation finished. To launch Zona, run $LAUNCH_SCRIPT_PATH"
+echo
+echo "If you wish to install additional mods on top of Zona, you must drop their archives into $CONTY_HOME in order to make them visible to Mod Organizer! A symlink to this folder has been added at $HOME/Games/zona/virtual_home"
 echo
 echo "Thank you for playing Zona!"
 exit 0
