@@ -390,29 +390,30 @@ ln -s "$DRIVE_C/anomaly" "$LINK_DIR/anomaly"
 
 section_change "EXTRACTING FILES"
 
+
 log_and_echo "Extracting $anomaly to $DRIVE_C/anomaly..."
-7z x -y -o"$DRIVE_C/anomaly" $TEMP_DIR/$anomaly | tee -a "$LOG_FILE"
+7z x -y -o"$DRIVE_C/anomaly" $TEMP_DIR/$anomaly 
 
 if [ "$exe_mode" == "1" ]; then
   log_and_echo "Extracting $demonized to $DRIVE_C/anomaly..."
-  7z x -y -o"$DRIVE_C/anomaly" $TEMP_DIR/$demonized | tee -a "$LOG_FILE"
+  7z x -y -o"$DRIVE_C/anomaly" $TEMP_DIR/$demonized 
 else
   log_and_echo "Extracting $mt_test to $DRIVE_C/anomaly..."
-  7z x -y -o"$DRIVE_C/anomaly" $TEMP_DIR/$mt_test | tee -a "$LOG_FILE"
+  7z x -y -o"$DRIVE_C/anomaly" $TEMP_DIR/$mt_test 
 fi
 
 log_and_echo "Extracting $mo2 to $DRIVE_C/mo2 ..."
 7z x -y -o"$DRIVE_C/mo2" $TEMP_DIR/$mo2
 
 log_and_echo "Extracting $profiles to $DRIVE_C/mo2/profiles ..."
-7z x -y -o"$DRIVE_C/mo2/profiles" $TEMP_DIR/$profiles | tee -a "$LOG_FILE"
+7z x -y -o"$DRIVE_C/mo2/profiles" $TEMP_DIR/$profiles 
 log_and_echo "Extracting ${zona[0]} to $DRIVE_C/mo2 ..."
-7z x -y -o"$DRIVE_C/mo2" "$TEMP_DIR/${zona[0]}" | tee -a "$LOG_FILE"
+7z x -y -o"$DRIVE_C/mo2" "$TEMP_DIR/${zona[0]}" 
 
 section_change "IMPORTING ZONA SETTINGS"
 
 if [ "$hud_mode" == "1" ]; then
-  7z x -y -o"$TEMP_DIR" "$TEMP_DIR/$clean" | tee -a "$LOG_FILE"
+  7z x -y -o"$TEMP_DIR" "$TEMP_DIR/$clean" 
   cp -r "$TEMP_DIR/Clean Hud/appdata" "$DRIVE_C/anomaly/"
   cp -r "$TEMP_DIR/Clean Hud/gamedata" "$DRIVE_C/anomaly/"
 else
