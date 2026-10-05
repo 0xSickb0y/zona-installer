@@ -1,0 +1,104 @@
+[project]
+name = "ZONA"
+version = "1.38"
+
+
+[defaults]
+install_dir = "$HOME/Games/ZONA"
+archives_dir = "$HOME/Games/.zona_archives"
+
+
+# Chosen by the user at install time (flags or prompt)
+[choices]
+hud  = { default = "clean", options = ["clean", "bhs"] }
+exes = { default = "mt",    options = ["regular", "mt"] }
+
+# kind: "archive" = extract into dest, "file" = just copy into dest
+# group/variant: only installed if the user picked that variant
+# md5: TODO, fill in
+
+[[artifacts]]
+id = "anomaly"
+kind = "archive"
+filename = "Anomaly-1.5.3-Full.2.7z"
+url = "https://www.moddb.com/downloads/start/277404" # TODO: Add logic to resolve moddb 302 redirect to download anomaly (wget maybe ?)
+md5 = ""
+dest = "{drive_c}/anomaly"
+
+
+[[artifacts]]
+id = "exes_regular"
+kind = "archive"
+group = "exes"
+variant = "regular"
+filename = "STALKER-Anomaly-modded-exes_2026.8.17.zip"
+url = "https://github.com/themrdemonized/xray-monolith/releases/download/2026.8.17/STALKER-Anomaly-modded-exes_2026.8.17.zip"
+md5 = ""
+dest = "{drive_c}/anomaly"
+
+
+[[artifacts]]
+id = "exes_mt"
+kind = "archive"
+group = "exes"
+variant = "mt"
+filename = "STALKER-Anomaly-modded-exes-MT-TEST_2026.8.17.zip"
+url = "https://github.com/themrdemonized/xray-monolith/releases/download/2026.8.17/STALKER-Anomaly-modded-exes-MT-TEST_2026.8.17.zip"
+md5 = ""
+dest = "{drive_c}/anomaly"
+
+
+[[artifacts]]
+id = "mo2"
+kind = "archive"
+filename = "Mod.Organizer-2.5.2.7z"
+url = "https://github.com/ModOrganizer2/modorganizer/releases/download/v2.5.2/Mod.Organizer-2.5.2.7z"
+md5 = ""
+dest = "{drive_c}/mo2"
+
+
+[[artifacts]]
+id = "profiles"
+kind = "archive"
+filename = "zona_profiles.7z"
+url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_profiles.7z"
+md5 = ""
+dest = "{drive_c}/mo2/profiles"
+
+
+# Multipart: download all parts, extract only the first
+[[artifacts]]
+id = "zona_modpack"
+kind = "archive"
+dest = "{drive_c}/mo2"
+parts = [
+  { filename = "zona_multipart.7z.001", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.001", md5 = "" },
+  { filename = "zona_multipart.7z.002", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.002", md5 = "" },
+  { filename = "zona_multipart.7z.003", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.003", md5 = "" },
+  { filename = "zona_multipart.7z.004", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.004", md5 = "" },
+  { filename = "zona_multipart.7z.005", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.005", md5 = "" },
+  { filename = "zona_multipart.7z.006", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.006", md5 = "" },
+  { filename = "zona_multipart.7z.007", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.007", md5 = "" },
+]
+
+
+[[artifacts]]
+id = "hud_clean"
+kind = "archive"
+group = "hud"
+variant = "clean"
+filename = "clean_hud.7z"
+url = "https://github.com/gtair/filehost-1/releases/download/v1.38/clean_hud.7z"
+md5 = ""
+dest = "{archives_dir}/hud"
+
+
+[[artifacts]]
+id = "hud_bhs"
+kind = "archive"
+group = "hud"
+variant = "bhs"
+filename = "bhs_hud.7z"
+url = "https://github.com/gtair/filehost-1/releases/download/v1.38/bhs_hud.7z"
+md5 = ""
+dest = "{archives_dir}/hud"
