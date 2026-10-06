@@ -13,92 +13,82 @@ archives_dir = "$HOME/Games/.zona_archives"
 hud  = { default = "clean", options = ["clean", "bhs"] }
 exes = { default = "mt",    options = ["regular", "mt"] }
 
-# kind: "archive" = extract into dest, "file" = just copy into dest
 # group/variant: only installed if the user picked that variant
-# md5: TODO, fill in
 
 [[artifacts]]
 id = "anomaly"
-kind = "archive"
 filename = "Anomaly-1.5.3-Full.2.7z"
 url = "https://www.moddb.com/downloads/start/277404" # TODO: Add logic to resolve moddb 302 redirect to download anomaly (wget maybe ?)
-md5 = ""
-dest = "{drive_c}/anomaly"
+md5 = "d6bce51a4e6d98f9610ef0aa967ba964"
+dest = "{install_dir}/{drive_c}/anomaly"
 
 
 [[artifacts]]
 id = "exes_regular"
-kind = "archive"
 group = "exes"
 variant = "regular"
 filename = "STALKER-Anomaly-modded-exes_2026.8.17.zip"
 url = "https://github.com/themrdemonized/xray-monolith/releases/download/2026.8.17/STALKER-Anomaly-modded-exes_2026.8.17.zip"
-md5 = ""
-dest = "{drive_c}/anomaly"
+md5 = "c570e313fcee1d4bcb3fbfbafc80f172"
+dest = "{install_dir}/{drive_c}/anomaly"
 
 
 [[artifacts]]
 id = "exes_mt"
-kind = "archive"
 group = "exes"
 variant = "mt"
 filename = "STALKER-Anomaly-modded-exes-MT-TEST_2026.8.17.zip"
 url = "https://github.com/themrdemonized/xray-monolith/releases/download/2026.8.17/STALKER-Anomaly-modded-exes-MT-TEST_2026.8.17.zip"
-md5 = ""
-dest = "{drive_c}/anomaly"
+md5 = "ca7588512843b67e49a5c7a42b877ea4"
+dest = "{install_dir}/{drive_c}/anomaly"
 
 
 [[artifacts]]
 id = "mo2"
-kind = "archive"
 filename = "Mod.Organizer-2.5.2.7z"
 url = "https://github.com/ModOrganizer2/modorganizer/releases/download/v2.5.2/Mod.Organizer-2.5.2.7z"
-md5 = ""
-dest = "{drive_c}/mo2"
+md5 = "b223ce1297107adbabb3fbaa3769eb2b"
+dest = "{install_dir}/{drive_c}/mo2"
 
 
 [[artifacts]]
 id = "profiles"
-kind = "archive"
 filename = "zona_profiles.7z"
 url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_profiles.7z"
-md5 = ""
-dest = "{drive_c}/mo2/profiles"
+md5 = "ee41f34e6f8abe5f85259477cd10f164"
+dest = "{install_dir}/{drive_c}/mo2/profiles"
 
 
 # Multipart: download all parts, extract only the first
 [[artifacts]]
 id = "zona_modpack"
-kind = "archive"
-dest = "{drive_c}/mo2"
+dest = "{install_dir}/{drive_c}/mo2"
 parts = [
-  { filename = "zona_multipart.7z.001", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.001", md5 = "" },
-  { filename = "zona_multipart.7z.002", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.002", md5 = "" },
-  { filename = "zona_multipart.7z.003", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.003", md5 = "" },
-  { filename = "zona_multipart.7z.004", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.004", md5 = "" },
-  { filename = "zona_multipart.7z.005", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.005", md5 = "" },
-  { filename = "zona_multipart.7z.006", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.006", md5 = "" },
-  { filename = "zona_multipart.7z.007", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.007", md5 = "" },
+  { filename = "zona_multipart.7z.001", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.001", md5 = "1ce9948b78e0ec33f5aa584ead32c9a5" },
+  { filename = "zona_multipart.7z.002", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.002", md5 = "dc56ba05dcce7ee968fb478fa18676b0" },
+  { filename = "zona_multipart.7z.003", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.003", md5 = "cb3e7c86fe411b3e2e71c7a8e6388f87" },
+  { filename = "zona_multipart.7z.004", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.004", md5 = "22e10771e3b06fda5fc8aa4dcfb2b9a0" },
+  { filename = "zona_multipart.7z.005", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.005", md5 = "969e63d0027a9d47d52017571972c252" },
+  { filename = "zona_multipart.7z.006", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.006", md5 = "4da041ce84a398a81cb3c2cf31224661" },
+  { filename = "zona_multipart.7z.007", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.007", md5 = "89929fa87b03fe3e6c3475aad5a0976e" },
 ]
 
 
 [[artifacts]]
 id = "hud_clean"
-kind = "archive"
 group = "hud"
 variant = "clean"
 filename = "clean_hud.7z"
 url = "https://github.com/gtair/filehost-1/releases/download/v1.38/clean_hud.7z"
-md5 = ""
-dest = "{archives_dir}/hud"
+md5 = "9261b48994c85707383cef1ccf8e5e97"
+dest = "{install_dir}/{drive_c}/mo2/mods"
 
 
 [[artifacts]]
 id = "hud_bhs"
-kind = "archive"
 group = "hud"
 variant = "bhs"
 filename = "bhs_hud.7z"
 url = "https://github.com/gtair/filehost-1/releases/download/v1.38/bhs_hud.7z"
-md5 = ""
-dest = "{archives_dir}/hud"
+md5 = "88544192fbf20e465fef7e7434e6cdb2"
+dest = "{install_dir}/{drive_c}/mo2/mods"

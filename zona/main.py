@@ -1,6 +1,5 @@
 from zona import setup
 from zona import config
-from zona import install
 
 def main():
     args = config.cli_arguments()
