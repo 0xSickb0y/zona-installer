@@ -8,9 +8,10 @@ Linux installer for the **ZONA** modpack for S.T.A.L.K.E.R.: Anomaly, written in
 
 ## Usage
 
-Requires Python 3.11+.
+Requires Python 3.11+ and 7zip.
 
-    pip install -e .
+    git clone https://github.com/0xSickb0y/zona-installer
+    pip install .
     zona --help
 
 | Command           | Status      | Description                                   |
