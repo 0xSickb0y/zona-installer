@@ -1,11 +1,13 @@
 import os
 import hashlib
+from zona.core.log import logger
 
 
 def verify_archives(TOML_CONFIG, ARCHIVES_DIR):
     """Check every downloaded file against the md5 in config.toml.
-    Returns {filename: "ok" | "failed" | "missing"}."""
-    print("\nInitiating MD5 Checksum")
+    Returns {filename: True | False | None}."""
+    print()
+    logger.info("[Initiating MD5 Checksum]")
 
     checksum_results = {}
     for artifact in TOML_CONFIG["artifacts"]:
@@ -16,13 +18,13 @@ def verify_archives(TOML_CONFIG, ARCHIVES_DIR):
             try:
                 if verify_md5(file_path, expected_md5):
                     checksum_results[filename] = True
-                    print(f"OK | {expected_md5} | {filename} ")
+                    logger.info(f"[{expected_md5} | {'OK':<7} | {filename}]")
                 else:
                     checksum_results[filename] = False
-                    print(f"FAILED | {expected_md5} | {filename} ")
+                    logger.error(f"[{expected_md5} | {'FAILED':<7} | {filename}]")
             except FileNotFoundError:
                 checksum_results[filename] = None
-                print(f"MISSING | {expected_md5} | {filename} ")
+                logger.warning(f"[{expected_md5} | {'MISSING':<7} | {filename}]")
     return checksum_results
 
 
