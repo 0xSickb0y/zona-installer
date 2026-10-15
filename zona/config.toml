@@ -10,8 +10,8 @@ archives_dir = "$HOME/Games/.zona_archives"
 
 # Chosen by the user at install time (flags or prompt)
 [choices]
-hud  = { default = "clean", options = ["clean", "bhs"] }
-exes = { default = "mt",    options = ["regular", "mt"] }
+hud  = { default = "bhs", options = ["clean", "bhs"] }
+exes = { default = "regular",    options = ["regular", "mt"] }
 
 # group/variant: only installed if the user picked that variant
 

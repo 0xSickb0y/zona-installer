@@ -1,3 +1,5 @@
+from zona.core.log import logger
+
 def yes_or_no(question, default=None):
     while True:
         answer = input(f"{question}").strip().lower()
@@ -8,4 +10,4 @@ def yes_or_no(question, default=None):
         if answer in ("n", "no"):
             return False
 
-        print("Please answer [Y, yes] or [N, no].")
+        logger.warning("- [Please answer [Y, yes] or [N, no].]\n")

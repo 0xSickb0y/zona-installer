@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def read_toml_configs():
-    with open(Path(__file__).parent / "config.toml", "rb") as f:
+    with open(Path(__file__).parent.parent / "config.toml", "rb") as f:
         return tomllib.load(f)
 
 
