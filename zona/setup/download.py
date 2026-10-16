@@ -13,13 +13,16 @@ def download_archives(artifacts, ARCHIVES_DIR, hud=None, exes=None):
         download_file(url, filename, ARCHIVES_DIR)
  
 
-def select_artifacts_for_download(artifacts, ARCHIVES_DIR, hud=None, exes=None): # TODO: implement hud from default(bhs) and CLI flags --hud clean or --hud bhs
+
+
+def select_artifacts_for_download(artifacts, ARCHIVES_DIR, hud=None, exes=None):
+    SKIP_FOR_NOW = ("anomaly", "zona_modpack")  # TODO: tmp, remove when ModDB and multipart are ready
     """
     check if "filename" already exists on the .zona_archives directory, if not download it.
     """
     result = {"Found": [], "Missing": []}
     for artifact in artifacts:
-        if artifact.get("group") != "hud":
+        if artifact["id"] in SKIP_FOR_NOW:
             continue
         for item in artifact.get("parts") or [artifact]:
             if path_ops.verify_existing_file(item["filename"], ARCHIVES_DIR=ARCHIVES_DIR):
