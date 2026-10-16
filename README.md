@@ -47,10 +47,10 @@ zona/
 
 ## Roadmap
 
-- [ ] Config file and CLI skeleton
+- [x] Config file and CLI skeleton
 - [ ] Cleaning functions
 - [ ] Download archives and anomaly
-- [ ] md5 verification
+- [x] md5 verification
 - [ ] Extract archives
 - [ ] Proton / Wine / umu setup
 - [ ] Launch script and `.desktop` entry
