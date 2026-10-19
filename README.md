@@ -73,16 +73,19 @@ zona setup
 ```
 pyproject.toml
 zona/
-├── main.py          # entry point
-├── config.py        # reads config.toml, defines the CLI with argparse
-├── config.toml
-├── utils.py         # helpers
+├── main.py                # entry point
+├── config.toml            # what gets installed (URLs, md5s, destinations)
+├── core/
+│   ├── config.py          # reads config.toml, defines the CLI with argparse
+│   ├── log.py             # colored logging
+│   └── utils.py           # helpers (yes_or_no)
 ├── setup/
-│   ├── __init__.py  # run(): the steps of `zona setup`
-│   ├── path_ops.py  # path operations (create, clean, etc)
-│   └── download.py  # download archives
-├── install/         # (empty for now)
-└── uninstall/       # (empty for now)
+│   ├── __init__.py        # run(): the steps of `zona setup`
+│   ├── path_ops.py        # path operations (create, clean, save archives)
+│   ├── download.py        # download archives
+│   └── hash_verification.py  # md5 checks
+├── install/               # (empty for now)
+└── uninstall/             # (empty for now)
 ```
 
 ## Roadmap
