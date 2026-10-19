@@ -5,10 +5,10 @@ from zona.core.log import logger
 
 def verify_archives(TOML_CONFIG, ARCHIVES_DIR):
     """Check every downloaded file against the md5 in config.toml.
-    Returns {filename: True | False | None}."""
-    print()
+    Returns (verify_ok, {filename: True | False | None})."""
     print("Initiating MD5 Checksums")
 
+    verify_ok = True
     checksum_results = {}
     for artifact in TOML_CONFIG["artifacts"]:
         for item in artifact.get("parts") or [artifact]:

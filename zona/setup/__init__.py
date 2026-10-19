@@ -1,6 +1,6 @@
 from zona.core import config
 from zona.core.log import logger
-from zona.setup import download, hash_verification, path_ops
+from zona.setup import download, hash_verification, path_ops, runner
 
 TOML_CONFIG = config.read_toml_configs()
 ARTIFACTS = TOML_CONFIG["artifacts"]
@@ -37,6 +37,10 @@ def run():
             logger.error(f"- [Missing archives ({len(missing)})]")
             for filename in missing:
                 print(f"{'':9} - {filename}")
+        # raise SystemExit(1) TODO: uncomment after runner testing is done
+
+    if not runner.setup_runner():
+        logger.error("- [Could not set up wine/steam, aborting]")
         raise SystemExit(1)
 
     # TODO:

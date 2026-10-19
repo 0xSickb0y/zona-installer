@@ -5,6 +5,13 @@ from zona.core import config
 from zona.core import utils
 from zona.core.log import logger
 
+STEAM_DIRS = {
+    "~/.steam/steam",
+    "~/.local/share/Steam",
+    "~/.var/app/com.valvesoftware.Steam",  # Flatpak
+}
+
+
 def verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR):
     """Returns (ok, results), results = {path: "cleaned" | "kept" | "created" | "failed"}."""
     zona_destinations = (INSTALL_DIR, ARCHIVES_DIR)
@@ -24,12 +31,11 @@ def verify_directories(zona_destinations):
                 clean_directory(path)
                 results[path] = "cleaned"
             except OSError as error:
-                logger.error(f"- [Could not clean '{path}': {error}]")
+                logger.error(f"- [Could not clean '{path}': {error}]\n")
                 results[path] = "failed"
         else:
-            logger.info(f"- [Keeping files inside '{path}']")
+            logger.info(f"- [Keeping files inside '{path}']\n")
             results[path] = "kept"
-        print("")
     return results
 
 
@@ -92,3 +98,14 @@ def save_archive_to_dest(filename, ARCHIVES_DIR, response):
             f.write(chunk)
     os.replace(tmp_path, dest_path)
 
+
+def steam_installed():
+    """True if a native or Flatpak Steam install is found."""
+    if shutil.which("steam"):
+        return True
+    return any(Path(directory).expanduser().exists() for directory in STEAM_DIRS)
+
+
+def wine_installed():
+    """True if both wine and winetricks are on the PATH."""
+    return shutil.which("wine") is not None and shutil.which("winetricks") is not None

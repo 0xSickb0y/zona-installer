@@ -23,11 +23,10 @@ def download_archives(artifacts, ARCHIVES_DIR, hud=None, exes=None):
  
 
 def select_artifacts_for_download(artifacts, ARCHIVES_DIR, hud=None, exes=None):
-    # TODO: download anomaly locally and fetch it from FS, (temporary solution until download i implemented)
-    SKIP_FOR_NOW = ("anomaly", "zona_modpack")  # TODO: tmp, remove when ModDB and multipart are ready
     """
     check if "filename" already exists on the .zona_archives directory, if not download it.
     """
+    SKIP_FOR_NOW = ("anomaly", "zona_modpack")  # TODO: tmp, remove when ModDB and multipart are ready
     result = {"Found": [], "Missing": []}
     for artifact in artifacts:
         if artifact["id"] in SKIP_FOR_NOW:
