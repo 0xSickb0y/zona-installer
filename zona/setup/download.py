@@ -4,18 +4,26 @@ from zona.core.log import logger
 
 
 def download_archives(artifacts, ARCHIVES_DIR, hud=None, exes=None):
-    """Select the artifacts, then download every file into the archives dir."""
-    result = select_artifacts_for_download(artifacts, ARCHIVES_DIR)
-    # TODO: add --verbose log here (Found, Missing)
-    for item in result["Missing"]:
-        url = item["url"]
-        filename = item["filename"]
-        download_file(url, filename, ARCHIVES_DIR)
+    """Download every missing archive.
+    Returns (ok, results), results = {"Found": [...], "Downloaded": [...], "Failed": [...]}."""
+    selected = select_artifacts_for_download(artifacts, ARCHIVES_DIR)
+    results = {
+        "Found": [item["filename"] for item in selected["Found"]],
+        "Downloaded": [],
+        "Failed": [],
+    }
+    for item in selected["Missing"]:
+        try:
+            download_file(item["url"], item["filename"], ARCHIVES_DIR)
+            results["Downloaded"].append(item["filename"])
+        except (requests.RequestException, OSError) as error:
+            logger.error(f"- [Failed to fetch {item['filename']}: {error}]")
+            results["Failed"].append(item["filename"])
+    return (not results["Failed"], results)
  
 
-
-
 def select_artifacts_for_download(artifacts, ARCHIVES_DIR, hud=None, exes=None):
+    # TODO: download anomaly locally and fetch it from FS, (temporary solution until download i implemented)
     SKIP_FOR_NOW = ("anomaly", "zona_modpack")  # TODO: tmp, remove when ModDB and multipart are ready
     """
     check if "filename" already exists on the .zona_archives directory, if not download it.

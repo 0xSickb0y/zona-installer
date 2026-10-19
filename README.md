@@ -28,6 +28,46 @@ Everything about *what* gets installed lives in __zona/config.toml__:
 - the HUD and exes variants the user can choose
 - every artifact: URL, filename, md5 and destination
 
+## Development
+
+### 1. Create the virtual environment:
+
+> `--home`: directory on the host used as the container's __$HOME__ (pick any path).
+> 
+> It's created if missing, and keeps your real ~/Games untouched.
+
+> `--volume`: the zona-installer repository folder
+> 
+> mounted at /src inside the container
+
+> Add `--nvidia` if you have an NVIDIA card
+
+```sh
+distrobox create --name zona-dev \
+  --image debian:bookworm \
+  --home <home> \
+  --volume <zona-installer-repo>:/src \
+  --additional-packages "python3 python3-venv python3-pip p7zip-full"
+  # --nvidia
+```
+
+### 2. Enter the virtual environment:
+
+```sh
+distrobox enter zona-dev -- bash
+
+python3 -m venv ~/.venv
+source ~/.venv/bin/activate
+pip install -e /src
+```
+
+### 3. Run the installer:
+
+```sh
+zona --help
+zona setup
+```
+
 ## Layout
 
 ```
@@ -47,10 +87,10 @@ zona/
 
 ## Roadmap
 
-- [ ] Config file and CLI skeleton
+- [x] Config file and CLI skeleton
 - [ ] Cleaning functions
 - [ ] Download archives and anomaly
-- [ ] md5 verification
+- [x] md5 verification
 - [ ] Extract archives
 - [ ] Proton / Wine / umu setup
 - [ ] Launch script and `.desktop` entry

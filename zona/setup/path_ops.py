@@ -6,30 +6,47 @@ from zona.core import utils
 from zona.core.log import logger
 
 def verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR):
+    """Returns (ok, results), results = {path: "cleaned" | "kept" | "created" | "failed"}."""
     zona_destinations = (INSTALL_DIR, ARCHIVES_DIR)
-    verify_directories(zona_destinations)
-    create_directories(zona_destinations)
+    results = verify_directories(zona_destinations)
+    results.update(create_directories(zona_destinations))
+    return ("failed" not in results.values(), results)
 
 def verify_directories(zona_destinations):
-    """Check which directories already exist and ask whether to clean each one."""
+    """Ask whether to clean each existing directory."""
+    results = {}
     for path in zona_destinations:
         if not path.exists():
             continue
         question = f"Directory '{path}' already exists. Delete its contents for a fresh install? [y/N] >>> "
         if utils.yes_or_no(question, default=False):
-            clean_directory(path)
+            try:
+                clean_directory(path)
+                results[path] = "cleaned"
+            except OSError as error:
+                logger.error(f"- [Could not clean '{path}': {error}]")
+                results[path] = "failed"
         else:
             logger.info(f"- [Keeping files inside '{path}']")
+            results[path] = "kept"
         print("")
+    return results
 
 
 def create_directories(zona_destinations):
     """Create the directories that don't exist yet."""
+    results = {}
     for path in zona_destinations:
         if path.exists():
             continue
-        path.mkdir(parents=True)
-        logger.info(f"- [Created directory '{path}']")
+        try:
+            path.mkdir(parents=True)
+            logger.info(f"- [Created directory '{path}']")
+            results[path] = "created"
+        except OSError as error:
+            logger.error(f"- [Could not create '{path}': {error}]")
+            results[path] = "failed"
+    return results
 
 
 def expand_var_and_user(raw_path):
