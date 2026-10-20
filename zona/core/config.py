@@ -31,7 +31,7 @@ def cli_arguments():
     )
     
     sub.add_parser(
-        "uninstall",
+        "delete",
         help="Remove the installed files and directories",
         description="Remove the installed ZONA files and directories.",
     )

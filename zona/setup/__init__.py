@@ -2,13 +2,18 @@ from zona.core import config
 from zona.core.log import logger
 from zona.setup import download, hash_verification, path_ops, runner
 
+
 TOML_CONFIG = config.read_toml_configs()
 ARTIFACTS = TOML_CONFIG["artifacts"]
+
 INSTALL_DIR = path_ops.expand_var_and_user(TOML_CONFIG["defaults"]["install_dir"])
 ARCHIVES_DIR = path_ops.expand_var_and_user(TOML_CONFIG["defaults"]["archives_dir"])
+WINE_PREFIX_DIR = path_ops.expand_var_and_user(TOML_CONFIG["defaults"]["wine_prefix_dir"])
+WINE_COMPONENTS = TOML_CONFIG["wine"]["components"]
+
 
 def run():
-    dirs_ok, _ = path_ops.verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR)
+    dirs_ok, _ = path_ops.verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR)
     if not dirs_ok:
         logger.error("- [Could not prepare the installation directories, aborting]")
         raise SystemExit(1)
@@ -43,6 +48,19 @@ def run():
         logger.error("- [Could not set up wine/steam, aborting]")
         raise SystemExit(1)
 
+    
+    if not runner.create_prefix(WINE_PREFIX_DIR):
+        logger.error("- [Could not set up wine prefix, aborting]")
+        raise SystemExit(1)
+
+    if not runner.install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
+        logger.error("- [Could not install prefix components, aborting]")
+        raise SystemExit(1)
+    else:
+        logger.info("- [Wine components installed successfully]")
+
     # TODO:
-        # install wine / proton / umu
+        # download anomaly (http or torrent)
+        # add checkpoints to the installer so it remembers completed steps
+        # reshade (optional)
         # cleaning functions

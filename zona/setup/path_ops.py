@@ -5,6 +5,7 @@ from zona.core import config
 from zona.core import utils
 from zona.core.log import logger
 
+
 STEAM_DIRS = {
     "~/.steam/steam",
     "~/.local/share/Steam",
@@ -12,30 +13,34 @@ STEAM_DIRS = {
 }
 
 
-def verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR):
+def verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR):
     """Returns (ok, results), results = {path: "cleaned" | "kept" | "created" | "failed"}."""
-    zona_destinations = (INSTALL_DIR, ARCHIVES_DIR)
+    zona_destinations = (INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR)
     results = verify_directories(zona_destinations)
     results.update(create_directories(zona_destinations))
     return ("failed" not in results.values(), results)
 
+
 def verify_directories(zona_destinations):
-    """Ask whether to clean each existing directory."""
+    """Ask whether to clean each existing directory (not those inside another one in the list)."""
     results = {}
     for path in zona_destinations:
         if not path.exists():
             continue
+        if any(path != other and path.is_relative_to(other) for other in zona_destinations):
+            continue  # the parent's answer already covers this one
         question = f"Directory '{path}' already exists. Delete its contents for a fresh install? [y/N] >>> "
         if utils.yes_or_no(question, default=False):
             try:
                 clean_directory(path)
                 results[path] = "cleaned"
             except OSError as error:
-                logger.error(f"- [Could not clean '{path}': {error}]\n")
+                logger.error(f"- [Could not clean '{path}': {error}]")
                 results[path] = "failed"
         else:
-            logger.info(f"- [Keeping files inside '{path}']\n")
+            logger.info(f"- [Keeping files inside '{path}']")
             results[path] = "kept"
+        print("")
     return results
 
 
