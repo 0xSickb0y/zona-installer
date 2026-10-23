@@ -63,7 +63,7 @@ def create_directories(zona_destinations):
 def expand_var_and_user(raw_path):
     expanded_path = Path(os.path.expandvars(raw_path)).expanduser()
     return expanded_path
-
+    
 
 def verify_existing_file(filename, ARCHIVES_DIR=None, INSTALL_DIR=None):
     """Could be used for both download and install
@@ -114,3 +114,12 @@ def steam_installed():
 def wine_installed():
     """True if both wine and winetricks are on the PATH."""
     return shutil.which("wine") is not None and shutil.which("winetricks") is not None
+
+
+def find_7z():
+    """Path of the first 7-zip binary found on the PATH, or None."""
+    for name in ("7z", "7zz", "7za"):
+        path = shutil.which(name)
+        if path:
+            return path
+    return None

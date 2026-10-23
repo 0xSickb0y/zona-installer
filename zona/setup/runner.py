@@ -23,6 +23,17 @@ INSTALL_COMMANDS = {
 }
 
 
+SEVENZIP_COMMANDS = {
+    "apt": [
+        ["sudo", "apt", "update"],
+        ["sudo", "apt", "install", "-y", "p7zip-full"],
+    ],
+    "pacman": [["sudo", "pacman", "-S", "--needed", "--noconfirm", "7zip"]],
+    "dnf": [["sudo", "dnf", "install", "-y", "p7zip", "p7zip-plugins"]],
+    "zypper": [["sudo", "zypper", "--non-interactive", "install", "7zip"]],
+}
+
+
 def detect_package_manager():
     """Name of the first supported package manager found on the PATH, or None."""
     for name in INSTALL_COMMANDS:
@@ -30,6 +41,40 @@ def detect_package_manager():
             return name
     return None
 
+
+def setup_7z():
+    """Make sure 7z is available, offering to install it. Returns True if it is."""
+    if path_ops.find_7z():
+        logger.info("- [7z found]")
+        return True
+
+    logger.warning("- [7z is not found]")
+    if not utils.yes_or_no("Install zip now? [Y/n] >>> ", default=True):
+        logger.error("- [7z is required to extract the archives]")
+        return False
+    return install_packages(SEVENZIP_COMMANDS)
+
+
+def install_packages(commands_by_manager):
+    """Run the install commands for the detected package manager. Returns True on success."""
+    manager = detect_package_manager()
+    if manager is None:
+        logger.error("- [No supported package manager found: install 7zip manually]")
+        return False
+
+    logger.info(f"- [Package manager: {manager}]")
+    for command in commands_by_manager[manager]:
+        logger.info(f"- [Running: {' '.join(command)}]")
+        try:
+            result = subprocess.run(command, capture_output=True, text=True)
+        except OSError as error:
+            logger.error(f"- [Could not run '{command[0]}': {error}]")
+            return False
+        if result.returncode != 0:
+            logger.error(f"- [Command failed: {' '.join(command)}]")
+            print(result.stderr[-1500:])
+            return False
+    return True
 
 def setup_runner():
     """Make sure a runner is available. Returns True if it is."""
@@ -70,7 +115,7 @@ def create_prefix(WINE_PREFIX_DIR):
         return True
 
     # TODO: --verbose show winedebug
-    env = {**os.environ, "WINEPREFIX": str(prefix_dir), "WINEDLLOVERRIDES": "mscoree,mshtml=", "WINEDEBUG": "-all"}
+    env = {**os.environ, "WINEPREFIX": str(WINE_PREFIX_DIR), "WINEDLLOVERRIDES": "mscoree,mshtml=", "WINEDEBUG": "-all"}
     logger.info(f"- [Creating wine prefix in '{WINE_PREFIX_DIR}']\n")
     try:
         result = subprocess.run(["wineboot", "-u"], env=env, capture_output=True, text=True)
@@ -92,7 +137,7 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
         try:
             # TODO: --verbose: use the line below instead to show winetricks output
             # subprocess.run(["winetricks", "-q", component], env=env, check=True)
-            subprocess.run(["winetricks", "-q", component], env=env, check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(["winetricks", "-q", component], env=env, check=True, stdout=subprocess.DEVNULL) # still not supressing output (why?)
         except (subprocess.CalledProcessError, OSError):
             logger.error(f"- [Failed to install {component}]")
             failed.append(component)
@@ -101,3 +146,16 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
         for component in failed:
             print(f"{'':9} - {component}")
     return not failed
+
+
+def run_exe(exe_path, working_dir, WINE_PREFIX_DIR):
+    """(TMP for DEMO) Run a Windows executable with wine inside the prefix. Returns False if wine can't run."""
+    env = {**os.environ, "WINEPREFIX": str(WINE_PREFIX_DIR)}
+    logger.info(f"- [Launching {exe_path.name}]")
+    try:
+        result = subprocess.run(["wine", str(exe_path)], env=env, cwd=working_dir)
+    except OSError as error:
+        logger.error(f"- [Could not run wine: {error}]")
+        return False
+    logger.info(f"- [{exe_path.name} exited with code {result.returncode}]")
+    return True

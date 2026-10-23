@@ -26,6 +26,7 @@ def run():
             print(f"{'':9} - {filename}")
         raise SystemExit(1)
 
+    print()
     verify_ok, checksum_results = hash_verification.verify_archives(TOML_CONFIG, ARCHIVES_DIR)
     if verify_ok:
         logger.info("- [All archives verified]")
@@ -48,6 +49,9 @@ def run():
         logger.error("- [Could not set up wine/steam, aborting]")
         raise SystemExit(1)
 
+    if not runner.setup_7z():
+        logger.error("- [Could not set up 7z, aborting]")
+        raise SystemExit(1)
     
     if not runner.create_prefix(WINE_PREFIX_DIR):
         logger.error("- [Could not set up wine prefix, aborting]")

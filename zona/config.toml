@@ -28,6 +28,8 @@ id = "anomaly"
 filename = "Anomaly-1.5.3-Full.2.7z"
 url = "https://www.moddb.com/downloads/start/277404" # TODO: Add logic to resolve moddb 302 redirect to download anomaly (wget maybe ?)
 md5 = "d6bce51a4e6d98f9610ef0aa967ba964"
+check_file = "AnomalyLauncher.exe"
+check_md5 = "5410f91807493fafa6c2dda136a324e7"
 dest = "{wine_prefix_dir}/drive_c/anomaly"
 
 
