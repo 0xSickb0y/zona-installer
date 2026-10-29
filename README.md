@@ -18,7 +18,7 @@ Requires Python 3.11+ and 7zip.
 |-------------------|-------------|-----------------------------------------------|
 | `zona setup`      | in progress | Create the install and archive directories    |
 | `zona install`    | planned     | Verify and install the modpack                |
-| `zona uninstall`  | planned     | Remove the installed files and directories    |
+| `zona delete`  | planned     | Remove the installed files and directories    |
 
 ## Configuration
 
@@ -59,6 +59,7 @@ distrobox enter zona-dev -- bash
 python3 -m venv ~/.venv
 source ~/.venv/bin/activate
 pip install -e /src
+sudo sed -i '/^Components:/ s/$/ contrib/' /etc/apt/sources.list.d/*.sources
 ```
 
 ### 3. Run the installer:
@@ -85,7 +86,7 @@ zona/
 │   ├── download.py        # download archives
 │   └── hash_verification.py  # md5 checks
 ├── install/               # (empty for now)
-└── uninstall/             # (empty for now)
+└── delete/             # (empty for now)
 ```
 
 ## Roadmap
@@ -94,7 +95,7 @@ zona/
 - [ ] Cleaning functions
 - [ ] Download archives and anomaly
 - [x] md5 verification
-- [ ] Extract archives
+- [x] Extract archives
 - [ ] Proton / Wine / umu setup
 - [ ] Launch script and `.desktop` entry
 - [ ] GUI

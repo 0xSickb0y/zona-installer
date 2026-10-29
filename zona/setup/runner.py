@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+from zona.core import utils
 from zona.setup import path_ops
 from zona.core.log import logger
 
@@ -76,6 +77,7 @@ def install_packages(commands_by_manager):
             return False
     return True
 
+
 def setup_runner():
     """Make sure a runner is available. Returns True if it is."""
     print()
@@ -111,18 +113,21 @@ def install_wine():
 def create_prefix(WINE_PREFIX_DIR):
     """Create the wine prefix with wineboot. Returns True on success."""
     if (WINE_PREFIX_DIR / "drive_c").exists():
-        logger.info(f"- [Wine prefix already exists: '{WINE_PREFIX_DIR}]\n")
+        logger.info(f"- [Wine prefix already exists: '{WINE_PREFIX_DIR}']\n")
         return True
 
     # TODO: --verbose show winedebug
     env = {**os.environ, "WINEPREFIX": str(WINE_PREFIX_DIR), "WINEDLLOVERRIDES": "mscoree,mshtml=", "WINEDEBUG": "-all"}
     logger.info(f"- [Creating wine prefix in '{WINE_PREFIX_DIR}']\n")
     try:
-        result = subprocess.run(["wineboot", "-u"], env=env, capture_output=True, text=True)
+        subprocess.run(["wineboot", "-u"], env=env, capture_output=True, text=True, check=True)
         if result.returncode != 0:
             logger.error(f"- [Could not create the wine prefix]\n{result.stderr}")
             return False
-    except (subprocess.CalledProcessError, OSError) as error:
+    except subprocess.CalledProcessError as error:
+        logger.error(f"- [Could not create the wine prefix (exit {error.returncode})]\n{error.stderr}")
+        return False
+    except OSError as error:
         logger.error(f"- [Could not create the wine prefix: {error}]\n")
         return False
     return True
@@ -135,11 +140,16 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
     for component in WINE_COMPONENTS:
         logger.info(f"- [Installing {component}]")
         try:
-            # TODO: --verbose: use the line below instead to show winetricks output
-            # subprocess.run(["winetricks", "-q", component], env=env, check=True)
-            subprocess.run(["winetricks", "-q", component], env=env, check=True, stdout=subprocess.DEVNULL) # still not supressing output (why?)
-        except (subprocess.CalledProcessError, OSError):
+            # TODO: --verbose: drop capture_output to show the winetricks output
+            result = subprocess.run(
+                ["winetricks", "-q", component], env=env, capture_output=True, text=True
+            )
+        except OSError as error:
+            logger.error(f"- [Could not run winetricks: {error}]")
+            return False
+        if result.returncode != 0:
             logger.error(f"- [Failed to install {component}]")
+            print(result.stderr[-1500:])
             failed.append(component)
     if failed:
         logger.error(f"- [Failed components ({len(failed)})]")

@@ -69,9 +69,19 @@ md5 = "ee41f34e6f8abe5f85259477cd10f164"
 dest = "{wine_prefix_dir}/drive_c/mo2/profiles"
 
 
+# Either the single archive or the multipart set is enough (see one_of)
+[[artifacts]]
+id = "zona_modpack_single"
+one_of = "modpack"
+filename = "Zona v1.38.7z"
+md5 = "5c10c4b68394de3297df36c3006db49f"
+dest = "{wine_prefix_dir}/drive_c/mo2"
+
+
 # Multipart: download all parts, extract only the first
 [[artifacts]]
 id = "zona_modpack"
+one_of = "modpack"
 dest = "{wine_prefix_dir}/drive_c/mo2"
 parts = [
   { filename = "zona_multipart.7z.001", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.001", md5 = "1ce9948b78e0ec33f5aa584ead32c9a5" },

@@ -1,18 +1,18 @@
 from zona.core import config
 from zona.core.log import logger
-from zona.setup import download, hash_verification, path_ops, runner
+from zona.setup import download, hash_verification, modpack, path_ops, runner
 
 
 TOML_CONFIG = config.read_toml_configs()
 ARTIFACTS = TOML_CONFIG["artifacts"]
-
-INSTALL_DIR = path_ops.expand_var_and_user(TOML_CONFIG["defaults"]["install_dir"])
-ARCHIVES_DIR = path_ops.expand_var_and_user(TOML_CONFIG["defaults"]["archives_dir"])
-WINE_PREFIX_DIR = path_ops.expand_var_and_user(TOML_CONFIG["defaults"]["wine_prefix_dir"])
 WINE_COMPONENTS = TOML_CONFIG["wine"]["components"]
 
 
-def run():
+def run(paths):
+    INSTALL_DIR = paths["install_dir"]
+    ARCHIVES_DIR = paths["archives_dir"]
+    WINE_PREFIX_DIR = paths["wine_prefix_dir"]
+
     dirs_ok, _ = path_ops.verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR)
     if not dirs_ok:
         logger.error("- [Could not prepare the installation directories, aborting]")
@@ -45,6 +45,13 @@ def run():
                 print(f"{'':9} - {filename}")
         # raise SystemExit(1) TODO: uncomment after runner testing is done
 
+    modpack_source = modpack.ensure_modpack(ARTIFACTS, ARCHIVES_DIR)
+    
+    if modpack_source is None:
+        logger.error("- [Could not get a usable modpack archive, aborting]")
+        raise SystemExit(1)
+    logger.info(f"- [Using modpack source: {modpack_source}]")
+
     if not runner.setup_runner():
         logger.error("- [Could not set up wine/steam, aborting]")
         raise SystemExit(1)
@@ -63,8 +70,4 @@ def run():
     else:
         logger.info("- [Wine components installed successfully]")
 
-    # TODO:
-        # download anomaly (http or torrent)
-        # add checkpoints to the installer so it remembers completed steps
-        # reshade (optional)
-        # cleaning functions
+    return modpack_source

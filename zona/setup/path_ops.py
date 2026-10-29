@@ -1,7 +1,6 @@
 import os
 import shutil
 from pathlib import Path
-from zona.core import config
 from zona.core import utils
 from zona.core.log import logger
 
@@ -40,7 +39,6 @@ def verify_directories(zona_destinations):
         else:
             logger.info(f"- [Keeping files inside '{path}']")
             results[path] = "kept"
-        print("")
     return results
 
 
@@ -123,3 +121,18 @@ def find_7z():
         if path:
             return path
     return None
+
+
+def resolve_paths(toml_config, install_dir=None, archives_dir=None):
+    """Directories from config.toml, with CLI values taking priority."""
+    paths = {
+        key: expand_var_and_user(value)
+        for key, value in toml_config["defaults"].items()
+    }
+    if install_dir is not None:
+        paths["install_dir"] = expand_var_and_user(install_dir).resolve()
+        # the prefix lives inside the install dir, so it follows the override
+        paths["wine_prefix_dir"] = paths["install_dir"] / "prefix"
+    if archives_dir is not None:
+        paths["archives_dir"] = expand_var_and_user(archives_dir).resolve()
+    return paths

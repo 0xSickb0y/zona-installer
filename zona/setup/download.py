@@ -22,15 +22,30 @@ def download_archives(artifacts, ARCHIVES_DIR, hud=None, exes=None):
     return (not results["Failed"], results)
  
 
+def download_artifact(artifact, ARCHIVES_DIR):
+    """Download the missing files of one artifact (single file or multipart).
+    Returns (ok, failed_filenames). Bypasses SKIP_FOR_NOW on purpose."""
+    failed = []
+    for item in artifact.get("parts") or [artifact]:
+        if path_ops.verify_existing_file(item["filename"], ARCHIVES_DIR=ARCHIVES_DIR):
+            continue
+        try:
+            download_file(item["url"], item["filename"], ARCHIVES_DIR)
+        except (requests.RequestException, OSError) as error:
+            logger.error(f"- [Failed to fetch {item['filename']}: {error}]")
+            failed.append(item["filename"])
+    return (not failed, failed)
+
+
 def select_artifacts_for_download(artifacts, ARCHIVES_DIR, hud=None, exes=None):
     """
     check if "filename" already exists on the .zona_archives directory, if not download it.
     """
-    SKIP_FOR_NOW = ("anomaly", "zona_modpack")  # TODO: tmp, remove when ModDB and multipart are ready
+    SKIP_FOR_NOW = ("anomaly",)  # TODO: tmp, remove when ModDB is ready
     result = {"Found": [], "Missing": []}
     for artifact in artifacts:
-        if artifact["id"] in SKIP_FOR_NOW:
-            continue
+        if artifact["id"] in SKIP_FOR_NOW or "one_of" in artifact:
+            continue  # one_of artifacts are handled by modpack.ensure_modpack()
         for item in artifact.get("parts") or [artifact]:
             if path_ops.verify_existing_file(item["filename"], ARCHIVES_DIR=ARCHIVES_DIR):
                 result["Found"].append(item)
