@@ -68,6 +68,7 @@ def run(paths, modpack_source):
     if exes_target.exists():
         logger.info(f"- [Modded exes already installed in '{exes_target.parent}', skipping extraction]")
     else:
+        path_ops.backup_original_bin(dest)
         logger.info(f"- [Extracting {exes_artifact['id']} ({exes_artifact['variant']})]")
         if not extract.extract_artifact(ARTIFACTS, exes_artifact["id"], paths):
             logger.error("- [Could not extract the selected exes variant, aborting]")

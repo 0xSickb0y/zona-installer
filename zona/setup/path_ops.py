@@ -143,6 +143,21 @@ def resolve_paths(toml_config, install_dir=None, archives_dir=None):
     return paths
 
 
+def backup_original_bin(dest):
+    """Move the original Anomaly bin folder aside before installing modded exes."""
+    original_bin = dest / "bin"
+    backup_dir = dest / "bin (Anomaly Original)"
+
+    if not original_bin.exists():
+        return
+    if backup_dir.exists():
+        logger.info(f"- [Backup already exists at '{backup_dir}', keeping it]")
+        return
+
+    logger.info(f"- [Backing up original bin folder to '{backup_dir}']")
+    shutil.move(str(original_bin), str(backup_dir))
+
+
 def render_template(template_path, dest_path, values):
     """Fill {{KEY}} placeholders in a template and write it to dest_path.
     Returns True on success. Line endings are preserved."""
