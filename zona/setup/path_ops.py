@@ -21,17 +21,21 @@ def verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR):
 
 
 def verify_directories(zona_destinations):
-    """Ask whether to clean each existing directory, skipping any nested pair in the set."""
+    """Ask whether to clean each existing directory, while skipping nested child cleanup when the parent is already being handled."""
     results = {}
     parents = list(zona_destinations)
     for path in parents:
         if not path.exists():
             continue
-        if any(
-            path != other and (path.is_relative_to(other) or other.is_relative_to(path))
+
+        nested_with_parent = any(
+            path != other and path.is_relative_to(other)
             for other in parents
-        ):
-            continue  # the parent/child pair is unsafe to clean independently
+        )
+        if nested_with_parent:
+            # Keep the parent prompt, but skip the nested child when it lives under another managed target.
+            continue
+
         question = f"Directory '{path}' already exists. Delete its contents for a fresh install? [y/N] >>> "
         if utils.yes_or_no(question, default=False):
             try:
