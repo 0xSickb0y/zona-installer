@@ -12,4 +12,7 @@ dependencies = ["requests"]
 zona = "zona.main:main"
 
 [tool.setuptools.package-data]
-zona = ["config.toml"]
+zona = [
+    "config.toml",
+    "templates/*.ini"
+]

@@ -15,6 +15,12 @@ def get_project_version():
 def cli_arguments():
     parser = argparse.ArgumentParser(prog="zona")
     parser.add_argument("--version", action="version", version=get_project_version())
+    parser.add_argument(
+        "-b",
+        "--no-banner",
+        action="store_true",
+        help="Suppress the startup banner",
+    )
     common = argparse.ArgumentParser(add_help=False)
 
     common.add_argument(
@@ -27,6 +33,13 @@ def cli_arguments():
         "-a", "--archives-dir",
         metavar="DIR",
         help="Where downloaded archives are stored (default: archives_dir from config.toml)",
+    )
+
+    common.add_argument(
+        "-b",
+        "--no-banner",
+        action="store_true",
+        help="Suppress the startup banner",
     )
 
     sub = parser.add_subparsers(dest="command", metavar="<command>")
@@ -50,6 +63,13 @@ def cli_arguments():
         parents=[common],
         help="Remove the installed files and directories",
         description="Remove the installed ZONA files and directories.",
+    )
+
+    sub.add_parser(
+        "mo2",
+        parents=[common],
+        help="Install or validate just Mod Organizer 2 in the Wine prefix",
+        description="Ensure the MO2 installation exists without re-running the full modpack install flow.",
     )
 
     args = parser.parse_args()

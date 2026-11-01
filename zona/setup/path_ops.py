@@ -21,13 +21,17 @@ def verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR):
 
 
 def verify_directories(zona_destinations):
-    """Ask whether to clean each existing directory (not those inside another one in the list)."""
+    """Ask whether to clean each existing directory, skipping any nested pair in the set."""
     results = {}
-    for path in zona_destinations:
+    parents = list(zona_destinations)
+    for path in parents:
         if not path.exists():
             continue
-        if any(path != other and path.is_relative_to(other) for other in zona_destinations):
-            continue  # the parent's answer already covers this one
+        if any(
+            path != other and (path.is_relative_to(other) or other.is_relative_to(path))
+            for other in parents
+        ):
+            continue  # the parent/child pair is unsafe to clean independently
         question = f"Directory '{path}' already exists. Delete its contents for a fresh install? [y/N] >>> "
         if utils.yes_or_no(question, default=False):
             try:
@@ -38,6 +42,7 @@ def verify_directories(zona_destinations):
                 results[path] = "failed"
         else:
             logger.info(f"- [Keeping files inside '{path}']")
+            print()
             results[path] = "kept"
     return results
 
@@ -64,18 +69,17 @@ def expand_var_and_user(raw_path):
     
 
 def verify_existing_file(filename, ARCHIVES_DIR=None, INSTALL_DIR=None):
-    """Could be used for both download and install
+    """Could be used for both download and install.
 
-    Check filename against 'ARCHIVES_DIR' for 'setup' and INSTALL_DIR  for 'install'
+    Check filename against ARCHIVES_DIR for setup and INSTALL_DIR for install.
     """
-    if ARCHIVES_DIR != None:
+    if ARCHIVES_DIR is not None:
         path = os.path.join(ARCHIVES_DIR, filename)
-        # TODO: add --verbose to log here
         return os.path.exists(path)
-    elif INSTALL_DIR != None:
+    if INSTALL_DIR is not None:
         path = os.path.join(INSTALL_DIR, filename)
-        # TODO: add --verbose to log here
         return os.path.exists(path)
+    return False
 
 
 def clean_directory(path):
@@ -85,6 +89,7 @@ def clean_directory(path):
         else:
             item.unlink()
     logger.info(f"- [Cleaned {path}]")
+    print()
 
 
 def save_archive_to_dest(filename, ARCHIVES_DIR, response):
@@ -136,3 +141,32 @@ def resolve_paths(toml_config, install_dir=None, archives_dir=None):
     if archives_dir is not None:
         paths["archives_dir"] = expand_var_and_user(archives_dir).resolve()
     return paths
+
+
+def render_template(template_path, dest_path, values):
+    """Fill {{KEY}} placeholders in a template and write it to dest_path.
+    Returns True on success. Line endings are preserved."""
+    try:
+        with open(template_path, newline="") as f:
+            text = f.read()
+        for key, value in values.items():
+            text = text.replace("{{" + key + "}}", value)
+        with open(dest_path, "w", newline="") as f:
+            f.write(text)
+    except OSError as error:
+        logger.error(f"- [ Could not write '{dest_path}': {error}]")
+        return False
+    
+    logger.info(f"- [Wrote '{dest_path}']")
+    return True
+
+
+def remove_files(directory, filenames):
+    """Delete the given files from directory. Missing files are ignored. Returns True on success."""
+    for filename in filenames:
+        try:
+            (directory / filename).unlink(missing_ok=True)
+        except OSError as error:
+            logger.error(f"- [Could not delete '{filename}': {error}]")
+            return False
+    return True

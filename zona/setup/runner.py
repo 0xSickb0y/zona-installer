@@ -50,17 +50,17 @@ def setup_7z():
         return True
 
     logger.warning("- [7z is not found]")
-    if not utils.yes_or_no("Install zip now? [Y/n] >>> ", default=True):
+    if not utils.yes_or_no("Install 7zip now? [Y/n] >>> ", default=True):
         logger.error("- [7z is required to extract the archives]")
         return False
-    return install_packages(SEVENZIP_COMMANDS)
+    return install_packages(SEVENZIP_COMMANDS, "7zip")
 
 
-def install_packages(commands_by_manager):
+def install_packages(commands_by_manager, package_label="packages"):
     """Run the install commands for the detected package manager. Returns True on success."""
     manager = detect_package_manager()
     if manager is None:
-        logger.error("- [No supported package manager found: install 7zip manually]")
+        logger.error(f"- [No supported package manager found: install {package_label} manually]")
         return False
 
     logger.info(f"- [Package manager: {manager}]")
@@ -94,20 +94,7 @@ def setup_runner():
 
 def install_wine():
     """Install wine and winetricks with the system package manager."""
-    manager = detect_package_manager()
-    if manager is None:
-        logger.error("- [No supported package manager found: install wine and winetricks manually]")
-        return False
-
-    logger.info(f"- [Package manager: {manager}]")
-    for command in INSTALL_COMMANDS[manager]:
-        logger.info(f"- [Running: {' '.join(command)}]\n")
-        try:
-            subprocess.run(command, check=True)
-        except (subprocess.CalledProcessError, OSError) as error:
-            logger.error(f"- [Command failed: {error}]\n")
-            return False
-    return True
+    return install_packages(INSTALL_COMMANDS, "wine and winetricks")
 
 
 def create_prefix(WINE_PREFIX_DIR):
@@ -117,13 +104,11 @@ def create_prefix(WINE_PREFIX_DIR):
         return True
 
     # TODO: --verbose show winedebug
-    env = {**os.environ, "WINEPREFIX": str(WINE_PREFIX_DIR), "WINEDLLOVERRIDES": "mscoree,mshtml=", "WINEDEBUG": "-all"}
+    # removed "WINEDLLOVERRIDES": "mscoree,mshtml=", reason: breaks installation
+    env = {**os.environ, "WINEPREFIX": str(WINE_PREFIX_DIR), "WINEDEBUG": "-all"}
     logger.info(f"- [Creating wine prefix in '{WINE_PREFIX_DIR}']\n")
     try:
         subprocess.run(["wineboot", "-u"], env=env, capture_output=True, text=True, check=True)
-        if result.returncode != 0:
-            logger.error(f"- [Could not create the wine prefix]\n{result.stderr}")
-            return False
     except subprocess.CalledProcessError as error:
         logger.error(f"- [Could not create the wine prefix (exit {error.returncode})]\n{error.stderr}")
         return False
@@ -136,8 +121,25 @@ def create_prefix(WINE_PREFIX_DIR):
 def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
     """Install winetricks components into the prefix. Returns True if all succeeded."""
     env = {**os.environ, "WINEPREFIX": str(WINE_PREFIX_DIR)}
+    try:
+        list_result = subprocess.run(
+            ["winetricks", "list-installed"], env=env, capture_output=True, text=True, check=False
+        )
+    except OSError as error:
+        logger.error(f"- [Could not query winetricks: {error}]")
+        return False
+
+    installed = set()
+    if list_result.returncode == 0:
+        output = list_result.stdout or ""
+        installed = {line.strip() for line in output.splitlines() if line.strip()}
+
     failed = []
     for component in WINE_COMPONENTS:
+        if component in installed:
+            logger.info(f"- [Skipping already-installed component: {component}]")
+            continue
+
         logger.info(f"- [Installing {component}]")
         try:
             # TODO: --verbose: drop capture_output to show the winetricks output
@@ -147,10 +149,20 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
         except OSError as error:
             logger.error(f"- [Could not run winetricks: {error}]")
             return False
-        if result.returncode != 0:
-            logger.error(f"- [Failed to install {component}]")
-            print(result.stderr[-1500:])
-            failed.append(component)
+
+        output = (result.stdout or "") + (result.stderr or "")
+        if result.returncode == 0:
+            installed.add(component)
+            continue
+
+        if "already installed" in output.lower() or "already exists" in output.lower():
+            logger.info(f"- [Skipping already-installed component: {component}]")
+            installed.add(component)
+            continue
+
+        logger.error(f"- [Failed to install {component}]")
+        print(output[-1500:])
+        failed.append(component)
     if failed:
         logger.error(f"- [Failed components ({len(failed)})]")
         for component in failed:
@@ -159,7 +171,7 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
 
 
 def run_exe(exe_path, working_dir, WINE_PREFIX_DIR):
-    """(TMP for DEMO) Run a Windows executable with wine inside the prefix. Returns False if wine can't run."""
+    """Run a Windows executable with wine inside the prefix. Returns False if wine can't run."""
     env = {**os.environ, "WINEPREFIX": str(WINE_PREFIX_DIR)}
     logger.info(f"- [Launching {exe_path.name}]")
     try:

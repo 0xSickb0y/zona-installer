@@ -56,7 +56,7 @@ def select_artifacts_for_download(artifacts, ARCHIVES_DIR, hud=None, exes=None):
 
 def download_file(url, filename, ARCHIVES_DIR):
     logger.info(f"- [Fetching {url}]")
-    with requests.get(url, stream=True) as response:
+    with requests.get(url, stream=True, timeout=(10, 60)) as response:
         response.raise_for_status()
         path_ops.save_archive_to_dest(filename, ARCHIVES_DIR, response)
 

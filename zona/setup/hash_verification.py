@@ -3,16 +3,12 @@ import hashlib
 from zona.core.log import logger
 
 
-def verify_archives(TOML_CONFIG, ARCHIVES_DIR):
-    """Check every downloaded file against the md5 in config.toml.
+def verify_archives(artifacts, ARCHIVES_DIR):
+    """Check every file of the given artifacts against its md5.
     Returns (verify_ok, {filename: True | False | None})."""
-    print("Initiating MD5 Checksums")
-
     verify_ok = True
     checksum_results = {}
-    for artifact in TOML_CONFIG["artifacts"]:
-        if "one_of" in artifact:
-            continue  # handled by resolve_one_of()
+    for artifact in artifacts:
         for item in artifact.get("parts") or [artifact]:
             filename = item["filename"]
             file_path = os.path.join(ARCHIVES_DIR, filename)
@@ -24,32 +20,7 @@ def verify_archives(TOML_CONFIG, ARCHIVES_DIR):
             log_result(filename, item["md5"], status)
             if status is not True:
                 verify_ok = False
-
     return (verify_ok, checksum_results)
-
-
-def resolve_one_of(artifacts, ARCHIVES_DIR, group, skip=()):
-    """Return the id of the first usable source in `group`, or None.
-
-    A source is usable when all its files exist and match their md5.
-    The single archive is tried before the multipart set (one file to extract).
-    """
-    sources = [a for a in artifacts if a.get("one_of") == group and a["id"] not in skip]
-    sources.sort(key=lambda a: "parts" in a) # single file first
-
-    for source in sources:
-        for item in source.get("parts") or [source]:
-            file_path = os.path.join(ARCHIVES_DIR, item["filename"])
-            try:
-                status = verify_md5(file_path, item["md5"])
-            except FileNotFoundError:
-                status = None
-            log_result(item["filename"], item["md5"], status)
-            if status is not True:
-                break # this source is unusable, don't hash the rest of it
-        else:
-            return source["id"]
-    return None
 
 
 def verify_md5(file_path, expected_md5):
