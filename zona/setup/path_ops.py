@@ -1,5 +1,6 @@
 import os
 import shutil
+import tarfile
 from pathlib import Path
 from zona.core import utils
 from zona.core.log import logger
@@ -12,20 +13,65 @@ STEAM_DIRS = {
 }
 
 
-def verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR):
+STEAM_RUNNER_DIRS = (
+    "~/.steam/root/compatibilitytools.d",
+    "~/.local/share/Steam/compatibilitytools.d",
+    "~/.var/app/com.valvesoftware.Steam/data/Steam/compatibilitytools.d",  # Flatpak
+)
+
+PROTECTED_STEAM_ROOTS = {
+    Path("~/.steam/root").expanduser().resolve(),
+    Path("~/.steam/steam/compatdata").expanduser().resolve(),
+    Path("~/.local/share/Steam/compatdata").expanduser().resolve(),
+    Path("~/.var/app/com.valvesoftware.Steam/data/Steam/compatdata").expanduser().resolve(),
+    *{Path(root).expanduser().resolve() for root in (*STEAM_DIRS, *STEAM_RUNNER_DIRS)},
+}
+
+
+def verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR, RUNNERS_DIR=None):
     """Returns (ok, results), results = {path: "cleaned" | "kept" | "created" | "failed"}."""
-    zona_destinations = (INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR)
+    zona_destinations = (INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR, RUNNERS_DIR)
     results = verify_directories(zona_destinations)
     results.update(create_directories(zona_destinations))
     return ("failed" not in results.values(), results)
 
 
+def is_steam_managed_path(path):
+    """True when the path sits under Steam's own compatdata or compatibilitytools.d trees.
+
+    This includes both the default Steam install locations and custom Steam library paths such as
+    /run/media/.../SteamLibrary/steamapps/compatdata/<appid>/pfx.
+    """
+    candidate = path.expanduser().resolve()
+    if any(candidate == root or candidate.is_relative_to(root) for root in PROTECTED_STEAM_ROOTS):
+        return True
+
+    lower_parts = {part.lower() for part in candidate.parts}
+    if "compatdata" in lower_parts or "compatibilitytools.d" in lower_parts:
+        return "steamapps" in lower_parts or "steamlibrary" in lower_parts or "steam" in lower_parts
+    return False
+
+
 def verify_directories(zona_destinations):
-    """Ask whether to clean each existing directory, while skipping nested child cleanup when the parent is already being handled."""
+    """Ask whether to clean each existing directory, while skipping nested child cleanup when the parent is already being handled.
+
+    Steam-managed directories are protected: their compatibilitytools.d and compatdata trees are not safe to delete
+    because they are owned by Steam and may contain runtime-managed data.
+    """
     results = {}
     parents = list(zona_destinations)
+    steam_detected = steam_installed()
+
+    if steam_detected:
+        logger.info("- [Steam found, its runners are searched too]")
+
     for path in parents:
         if not path.exists():
+            continue
+
+        if is_steam_managed_path(path):
+            logger.info(f"- [Protected Steam-managed directory, keeping contents inside '{path}']")
+            results[path] = "kept"
             continue
 
         nested_with_parent = any(
@@ -68,6 +114,13 @@ def create_directories(zona_destinations):
 
 
 def expand_var_and_user(raw_path):
+    if raw_path is None:
+        return None
+    if isinstance(raw_path, Path):
+        raw_path = str(raw_path)
+    raw_path = str(raw_path).strip()
+    if raw_path == "":
+        return None
     expanded_path = Path(os.path.expandvars(raw_path)).expanduser()
     return expanded_path
     
@@ -118,9 +171,49 @@ def steam_installed():
     return any(Path(directory).expanduser().exists() for directory in STEAM_DIRS)
 
 
-def wine_installed():
-    """True if both wine and winetricks are on the PATH."""
-    return shutil.which("wine") is not None and shutil.which("winetricks") is not None
+
+def runner_dirs(runners_dir):
+    """Folders that may hold GE-Proton: Steam's (only if Steam is installed), then ours."""
+    steam_dirs = [Path(d).expanduser() for d in STEAM_RUNNER_DIRS] if steam_installed() else []
+    return steam_dirs + [Path(runners_dir)]
+
+
+def find_ge_proton(runners_dir, name=None):
+    """Path of a GE-Proton 'proton' script, or None. With `name` (e.g. 'GE-Proton10-9')
+    only that version matches, otherwise the newest one wins."""
+    candidates = [
+        proton
+        for base in runner_dirs(runners_dir)
+        for proton in base.glob(f"{name or 'GE-Proton*'}/proton")
+        if proton.is_file()
+    ]
+    return max(candidates, key=lambda p: p.stat().st_mtime, default=None)
+
+
+def find_proton_wine(proton):
+    """Path to the Wine binary inside a GE-Proton install, or None."""
+    if proton is None:
+        return None
+    proton_dir = Path(proton).resolve().parent
+    candidates = (
+        proton_dir / "files" / "bin" / "wine",
+        proton_dir / "files" / "bin" / "wine64",
+        proton_dir / "wine",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def find_protontricks():
+    """Path to protontricks, or None if it is not installed."""
+    return shutil.which("protontricks")
+
+
+def protontricks_installed():
+    """True if protontricks is on the PATH."""
+    return shutil.which("protontricks") is not None
 
 
 def find_7z():
@@ -132,23 +225,107 @@ def find_7z():
     return None
 
 
-def resolve_paths(toml_config, install_dir=None, archives_dir=None):
-    """Directories from config.toml, with CLI values taking priority."""
+def find_aria2c():
+    """Path to aria2c, or None if it is not installed."""
+    return shutil.which("aria2c")
+
+
+def steam_default_runners_dir():
+    """A reasonable Steam-compatible runner location for GE-Proton lookup.
+
+    This is used when the config does not define a custom runner directory, while still
+    respecting any user-provided CLI override and the existing Steam detection logic.
+    """
+    for candidate in STEAM_RUNNER_DIRS:
+        path = Path(candidate).expanduser()
+        if path.exists():
+            return path
+    return Path("~/.steam/root/compatibilitytools.d").expanduser()
+
+
+def steam_default_prefix_dir():
+    """Base prefix path for a Steam-managed Proton prefix.
+
+    A Proton prefix is typically under compatdata/<appid>/pfx; when the project leaves
+    the default unset, use Steam's default compatdata layout rather than a hardcoded TOML path.
+    """
+    for root in STEAM_DIRS:
+        steam_root = Path(root).expanduser()
+        if steam_root.exists():
+            return (steam_root / "compatdata" / "999999" / "pfx").resolve()
+    return (Path("~/.steam/steam/compatdata/999999/pfx").expanduser()).resolve()
+
+
+def is_valid_steam_proton_prefix(path):
+    """Best-effort validation for a Steam-style Proton prefix location.
+
+    Accept paths that end in /compatdata/<appid>/pfx and reject obviously wrong values.
+    """
+    candidate = expand_var_and_user(path)
+    if candidate is None:
+        return False
+    candidate = candidate.resolve()
+    if candidate.name != "pfx":
+        return False
+    return "compatdata" in candidate.parts and candidate.parent.name.isdigit()
+
+
+def resolve_paths(toml_config, install_dir=None, archives_dir=None, runners_dir=None, proton_prefix=None):
+    """Directories from config.toml, with CLI values taking priority.
+
+    If the default config omits the runner/prefix, we resolve a Steam-compatible default at runtime.
+    This keeps the defaults flexible without hardcoding those locations into TOML.
+    """
     paths = {
         key: expand_var_and_user(value)
         for key, value in toml_config["defaults"].items()
     }
+
     if install_dir is not None:
-        paths["install_dir"] = expand_var_and_user(install_dir).resolve()
-        # the prefix lives inside the install dir, so it follows the override
-        paths["wine_prefix_dir"] = paths["install_dir"] / "prefix"
+        paths["install_dir"] = expand_var_and_user(install_dir)
+        if paths["install_dir"] is not None:
+            paths["install_dir"] = paths["install_dir"].resolve()
+
     if archives_dir is not None:
-        paths["archives_dir"] = expand_var_and_user(archives_dir).resolve()
+        paths["archives_dir"] = expand_var_and_user(archives_dir)
+        if paths["archives_dir"] is not None:
+            paths["archives_dir"] = paths["archives_dir"].resolve()
+
+    if proton_prefix is not None:
+        paths["wine_prefix_dir"] = expand_var_and_user(proton_prefix)
+        if paths["wine_prefix_dir"] is not None:
+            paths["wine_prefix_dir"] = paths["wine_prefix_dir"].resolve()
+            if not is_valid_steam_proton_prefix(paths["wine_prefix_dir"]):
+                logger.warning(
+                    "- [Custom Proton prefix does not look like a Steam compatdata/<appid>/pfx folder; continuing anyway]"
+                )
+    elif "wine_prefix_dir" not in paths or paths["wine_prefix_dir"] is None:
+        paths["wine_prefix_dir"] = steam_default_prefix_dir()
+    else:
+        paths["wine_prefix_dir"] = paths["wine_prefix_dir"].resolve()
+
+    if runners_dir is not None:
+        paths["runners_dir"] = expand_var_and_user(runners_dir)
+        if paths["runners_dir"] is not None:
+            paths["runners_dir"] = paths["runners_dir"].resolve()
+    elif "runners_dir" not in paths or paths["runners_dir"] is None:
+        paths["runners_dir"] = steam_default_runners_dir()
+    else:
+        paths["runners_dir"] = paths["runners_dir"].resolve()
+
+    if not paths["runners_dir"].is_absolute():
+        paths["runners_dir"] = paths["runners_dir"].resolve()
+
     return paths
 
 
 def backup_original_bin(dest):
-    """Move the original Anomaly bin folder aside before installing modded exes."""
+    """Copy the original Anomaly bin folder aside before installing modded exes.
+
+    The live bin folder must remain in place so the extracted modded EXEs can be
+    merged into it and overwrite the originals while preserving every other runtime
+    file in the game install.
+    """
     original_bin = dest / "bin"
     backup_dir = dest / "bin (Anomaly Original)"
 
@@ -159,7 +336,30 @@ def backup_original_bin(dest):
         return
 
     logger.info(f"- [Backing up original bin folder to '{backup_dir}']")
-    shutil.move(str(original_bin), str(backup_dir))
+    shutil.copytree(str(original_bin), str(backup_dir), dirs_exist_ok=False)
+
+
+def backup_file(path):
+    """Copy path to path + '.bak' (replacing an older backup). Returns True on success."""
+    try:
+        shutil.copy2(path, str(path) + ".bak")
+    except OSError as error:
+        logger.error(f"- [Could not back up '{path}': {error}]")
+        return False
+    return True
+
+
+def extract_tarball(tarball_path, dest_dir):
+    """Extract a .tar.gz into dest_dir. Returns True on success."""
+    kwargs = {"filter": "data"} if hasattr(tarfile, "data_filter") else {}
+    try:
+        with tarfile.open(tarball_path) as tar:
+            tar.extractall(dest_dir, **kwargs)
+    except (tarfile.TarError, OSError) as error:
+        logger.error(f"- [Could not extract '{tarball_path.name}': {error}]")
+        return False
+    logger.info(f"- [Extracted {tarball_path.name} to '{dest_dir}']")
+    return True
 
 
 def render_template(template_path, dest_path, values):
@@ -189,3 +389,4 @@ def remove_files(directory, filenames):
             logger.error(f"- [Could not delete '{filename}': {error}]")
             return False
     return True
+

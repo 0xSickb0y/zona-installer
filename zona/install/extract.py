@@ -31,7 +31,6 @@ def extract_archive(filename, ARCHIVES_DIR, dest):
     return True
 
 
-
 def extract_artifact(artifacts, artifact_id, paths):
     """Extract one artifact into its `dest`. Returns True on success.
 
@@ -42,15 +41,3 @@ def extract_artifact(artifacts, artifact_id, paths):
     first = artifact["parts"][0] if "parts" in artifact else artifact
     dest = Path(artifact["dest"].format(**paths))
     return extract_archive(first["filename"], paths["archives_dir"], dest)
-
-
-def extract_modpack(artifacts, source_id, paths):
-    """Extract the verified modpack source. Returns True on success.
-
-    Single archive: extract its own filename. Multipart: extract only the
-    first volume, 7z finds the other parts in the same folder.
-    """
-    source = next(a for a in artifacts if a["id"] == source_id)
-    archive = source["parts"][0]["filename"] if "parts" in source else source["filename"]
-    dest = Path(source["dest"].format(**paths))
-    return extract_archive(archive, paths["archives_dir"], dest)

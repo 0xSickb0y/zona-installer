@@ -1,25 +1,25 @@
 import os
 import shutil
 import subprocess
+from pathlib import Path
 from zona.core import utils
 from zona.setup import path_ops
 from zona.core.log import logger
 
 
-INSTALL_COMMANDS = {
+PROTONTRICKS_COMMANDS = {
     "apt": [
-        ["sudo", "dpkg", "--add-architecture", "i386"],
         ["sudo", "apt", "update"],
-        ["sudo", "apt", "install", "-y", "wine", "winetricks"],
+        ["sudo", "apt", "install", "-y", "protontricks"],
     ],
     "pacman": [
-        ["sudo", "pacman", "-S", "--needed", "--noconfirm", "wine", "winetricks"],
+        ["sudo", "pacman", "-S", "--needed", "--noconfirm", "protontricks"],
     ],
     "dnf": [
-        ["sudo", "dnf", "install", "-y", "wine", "winetricks"],
+        ["sudo", "dnf", "install", "-y", "protontricks"],
     ],
     "zypper": [
-        ["sudo", "zypper", "--non-interactive", "install", "wine", "winetricks"],
+        ["sudo", "zypper", "--non-interactive", "install", "protontricks"],
     ],
 }
 
@@ -35,9 +35,20 @@ SEVENZIP_COMMANDS = {
 }
 
 
+ARIA2_COMMANDS = {
+    "apt": [
+        ["sudo", "apt", "update"],
+        ["sudo", "apt", "install", "-y", "aria2"],
+    ],
+    "pacman": [["sudo", "pacman", "-S", "--needed", "--noconfirm", "aria2"]],
+    "dnf": [["sudo", "dnf", "install", "-y", "aria2"]],
+    "zypper": [["sudo", "zypper", "--non-interactive", "install", "aria2"]],
+}
+
+
 def detect_package_manager():
     """Name of the first supported package manager found on the PATH, or None."""
-    for name in INSTALL_COMMANDS:
+    for name in PROTONTRICKS_COMMANDS:
         if shutil.which(name):
             return name
     return None
@@ -54,6 +65,19 @@ def setup_7z():
         logger.error("- [7z is required to extract the archives]")
         return False
     return install_packages(SEVENZIP_COMMANDS, "7zip")
+
+
+def setup_aria2c():
+    """Make sure aria2c is available, offering to install it. Returns True if it is."""
+    if path_ops.find_aria2c():
+        logger.info("- [aria2c found]")
+        return True
+
+    logger.warning("- [aria2c is not found]")
+    if not utils.yes_or_no("Install aria2 now? [Y/n] >>> ", default=True):
+        logger.error("- [aria2c is required for magnet and torrent downloads]")
+        return False
+    return install_packages(ARIA2_COMMANDS, "aria2c")
 
 
 def install_packages(commands_by_manager, package_label="packages"):
@@ -78,52 +102,90 @@ def install_packages(commands_by_manager, package_label="packages"):
     return True
 
 
-def setup_runner():
-    """Make sure a runner is available. Returns True if it is."""
-    print()
-    if path_ops.steam_installed():
-        logger.info("- [Steam found]") # TODO: decide whether to use Steam's Proton / GE-Proton / Etc
+def get_proton(runners_dir):
+    """Path of the GE-Proton 'proton' script, or None (with an error logged)."""
+    proton = path_ops.find_ge_proton(runners_dir)
+    if proton is None:
+        logger.error("- [GE-Proton not found, run 'zona setup' first]")
+    return proton
+
+
+def proton_env(WINE_PREFIX_DIR):
+    """Environment for running things in the prefix through GE-Proton.
+    Proton keeps its prefix in '<compat data path>/pfx', so the compat path is the parent."""
+    compat_dir = WINE_PREFIX_DIR.parent
+    return {
+        **os.environ,
+        "STEAM_COMPAT_DATA_PATH": str(compat_dir),
+        "STEAM_COMPAT_CLIENT_INSTALL_PATH": str(compat_dir.parent),
+    }
+
+
+def setup_protontricks():
+    """Make sure protontricks is available (it installs the prefix components). Returns True if it is."""
+    if path_ops.find_protontricks():
+        logger.info("- [protontricks found]")
         return True
-    
-    logger.info("- [Steam not found]")
-    if path_ops.wine_installed():
-        logger.info("- [wine and winetricks already installed]")
-        return True
-    return install_wine()
 
-
-def install_wine():
-    """Install wine and winetricks with the system package manager."""
-    return install_packages(INSTALL_COMMANDS, "wine and winetricks")
-
-
-def create_prefix(WINE_PREFIX_DIR):
-    """Create the wine prefix with wineboot. Returns True on success."""
-    if (WINE_PREFIX_DIR / "drive_c").exists():
-        logger.info(f"- [Wine prefix already exists: '{WINE_PREFIX_DIR}']\n")
-        return True
-
-    # TODO: --verbose show winedebug
-    # removed "WINEDLLOVERRIDES": "mscoree,mshtml=", reason: breaks installation
-    env = {**os.environ, "WINEPREFIX": str(WINE_PREFIX_DIR), "WINEDEBUG": "-all"}
-    logger.info(f"- [Creating wine prefix in '{WINE_PREFIX_DIR}']\n")
-    try:
-        subprocess.run(["wineboot", "-u"], env=env, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as error:
-        logger.error(f"- [Could not create the wine prefix (exit {error.returncode})]\n{error.stderr}")
+    logger.warning("- [protontricks is not found]")
+    if not utils.yes_or_no("Install protontricks now? [Y/n] >>> ", default=True):
+        logger.error("- [protontricks is required to install the prefix components]")
         return False
+    return install_packages(PROTONTRICKS_COMMANDS, "protontricks")
+
+
+def create_prefix(WINE_PREFIX_DIR, runners_dir):
+    """Create the prefix by letting GE-Proton set it up. Returns True on success."""
+    if (WINE_PREFIX_DIR / "drive_c").exists():
+        logger.info(f"- [Wine prefix already exists: '{WINE_PREFIX_DIR}']")
+        return True
+
+    proton = get_proton(runners_dir)
+    if proton is None:
+        return False
+
+    logger.info(f"- [Creating the prefix with GE-Proton in '{WINE_PREFIX_DIR}']")
+    try:
+        result = subprocess.run(
+            [str(proton), "run", "wineboot", "-u"],
+            env=proton_env(WINE_PREFIX_DIR), capture_output=True, text=True,
+        )
     except OSError as error:
-        logger.error(f"- [Could not create the wine prefix: {error}]\n")
+        logger.error(f"- [Could not run GE-Proton: {error}]")
+        return False
+
+    if not (WINE_PREFIX_DIR / "drive_c").exists():
+        logger.error(f"- [GE-Proton did not create the prefix (exit {result.returncode})]")
+        print(result.stderr[-1500:])
         return False
     return True
 
 
-def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
-    """Install winetricks components into the prefix. Returns True if all succeeded."""
-    env = {**os.environ, "WINEPREFIX": str(WINE_PREFIX_DIR)}
+def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, runners_dir):
+    """Install Windows components into the Proton prefix without requiring a Steam AppID."""
+    proton = get_proton(runners_dir)
+    if proton is None:
+        return False
+
+    wine = path_ops.find_proton_wine(proton)
+    if wine is None:
+        logger.error("- [Could not find the Proton wine binary]")
+        return False
+
+    env = {
+        **proton_env(WINE_PREFIX_DIR),
+        "WINEPREFIX": str(WINE_PREFIX_DIR),
+        "WINE": str(wine),
+        "WINESERVER": str(wine.with_name("wineserver")),
+    }
+
     try:
         list_result = subprocess.run(
-            ["winetricks", "list-installed"], env=env, capture_output=True, text=True, check=False
+            ["winetricks", "list-installed"],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
         )
     except OSError as error:
         logger.error(f"- [Could not query winetricks: {error}]")
@@ -135,6 +197,7 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
         installed = {line.strip() for line in output.splitlines() if line.strip()}
 
     failed = []
+    print("\nInstalling Proton prefix components")
     for component in WINE_COMPONENTS:
         if component in installed:
             logger.info(f"- [Skipping already-installed component: {component}]")
@@ -142,9 +205,12 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
 
         logger.info(f"- [Installing {component}]")
         try:
-            # TODO: --verbose: drop capture_output to show the winetricks output
             result = subprocess.run(
-                ["winetricks", "-q", component], env=env, capture_output=True, text=True
+                ["winetricks", "-q", component],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
             )
         except OSError as error:
             logger.error(f"- [Could not run winetricks: {error}]")
@@ -170,14 +236,44 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS):
     return not failed
 
 
-def run_exe(exe_path, working_dir, WINE_PREFIX_DIR):
-    """Run a Windows executable with wine inside the prefix. Returns False if wine can't run."""
-    env = {**os.environ, "WINEPREFIX": str(WINE_PREFIX_DIR)}
-    logger.info(f"- [Launching {exe_path.name}]")
-    try:
-        result = subprocess.run(["wine", str(exe_path)], env=env, cwd=working_dir)
-    except OSError as error:
-        logger.error(f"- [Could not run wine: {error}]")
+
+# def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, runners_dir):
+#     """Run a Windows executable through GE-Proton. Returns False only if it could not be started."""
+#     proton = get_proton(runners_dir)
+#     if proton is None:
+#         return False
+
+#     logger.info(f"- [Launching via GE-Proton: {exe_path.name}]")
+#     try:
+#         result = subprocess.run(
+#             [str(proton), "run", str(exe_path)],
+#             env=proton_env(WINE_PREFIX_DIR), cwd=working_dir,
+#         )
+#     except OSError as error:
+#         logger.error(f"- [Could not run GE-Proton: {error}]")
+#         return False
+#     logger.info(f"- [{exe_path.name} exited with code {result.returncode}]")
+#     return True
+
+def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, runners_dir):
+    """Run a Windows executable through GE-Proton with the app folder as cwd."""
+    proton = get_proton(runners_dir)
+    if proton is None:
         return False
+
+    exe_path = Path(exe_path)
+    working_dir = Path(working_dir)
+
+    logger.info(f"- [Launching via GE-Proton: {exe_path.name}]")
+    try:
+        result = subprocess.run(
+            [str(proton), "run", str(exe_path)],
+            env=proton_env(WINE_PREFIX_DIR),
+            cwd=str(working_dir),
+        )
+    except OSError as error:
+        logger.error(f"- [Could not run GE-Proton: {error}]")
+        return False
+
     logger.info(f"- [{exe_path.name} exited with code {result.returncode}]")
     return True
