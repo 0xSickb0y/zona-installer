@@ -6,7 +6,7 @@ from zona.core import utils
 from zona.core.log import logger
 
 
-STEAM_DIRS = {
+STEAM_ROOTS = {
     "~/.steam/steam",
     "~/.local/share/Steam",
     "~/.var/app/com.valvesoftware.Steam",  # Flatpak
@@ -24,15 +24,48 @@ PROTECTED_STEAM_ROOTS = {
     Path("~/.steam/steam/compatdata").expanduser().resolve(),
     Path("~/.local/share/Steam/compatdata").expanduser().resolve(),
     Path("~/.var/app/com.valvesoftware.Steam/data/Steam/compatdata").expanduser().resolve(),
-    *{Path(root).expanduser().resolve() for root in (*STEAM_DIRS, *STEAM_RUNNER_DIRS)},
+    *{Path(root).expanduser().resolve() for root in (*STEAM_ROOTS, *STEAM_RUNNER_DIRS)},
 }
 
 
-def verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR, RUNNERS_DIR=None):
-    """Returns (ok, results), results = {path: "cleaned" | "kept" | "created" | "failed"}."""
-    zona_destinations = (INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR, RUNNERS_DIR)
-    results = verify_directories(zona_destinations)
-    results.update(create_directories(zona_destinations))
+def verify_and_create_directories(INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR, RUNNERS_DIR=None, artifacts=None, checksum_results=None, verify_ok=None,):
+    """Returns (ok, results).
+
+    Reuse previously verified checksum results when available.
+    Otherwise, verify the archive cache before preserving it.
+    """
+    listed = [
+        p for p in (INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR, RUNNERS_DIR)
+        if p is not None
+    ]
+
+    keep_archives = False
+    if ARCHIVES_DIR is not None and artifacts:
+        if verify_ok is None or checksum_results is None:
+            from zona.setup import hash_verification
+            logger.info(f"- [Verifying archive cache at '{ARCHIVES_DIR}']")
+            verify_ok, checksum_results = hash_verification.verify_archives(
+                artifacts, ARCHIVES_DIR
+            )
+        else:
+            logger.info("- [Reusing previous archive checksum verification]")
+        keep_archives = verify_ok
+        if keep_archives:
+            logger.info("- [Archive cache verified; keeping existing files]")
+        else:
+            logger.warning(
+                "- [Archive cache contains missing or corrupted archives]"
+            )
+    if keep_archives:
+        listed = [p for p in listed if p != ARCHIVES_DIR]
+    results = verify_directories(listed)
+    if keep_archives:
+        results[ARCHIVES_DIR] = "kept"
+    remaining = [
+        p for p in (INSTALL_DIR, ARCHIVES_DIR, WINE_PREFIX_DIR, RUNNERS_DIR)
+        if p is not None and p not in results
+    ]
+    results.update(create_directories(remaining))
     return ("failed" not in results.values(), results)
 
 
@@ -82,6 +115,7 @@ def verify_directories(zona_destinations):
             # Keep the parent prompt, but skip the nested child when it lives under another managed target.
             continue
 
+        print()
         question = f"Directory '{path}' already exists. Delete its contents for a fresh install? [y/N] >>> "
         if utils.yes_or_no(question, default=False):
             try:
@@ -168,14 +202,59 @@ def steam_installed():
     """True if a native or Flatpak Steam install is found."""
     if shutil.which("steam"):
         return True
-    return any(Path(directory).expanduser().exists() for directory in STEAM_DIRS)
+    return any(Path(directory).expanduser().exists() for directory in STEAM_ROOTS)
 
+
+def find_steam_root():
+    """The Steam install folder (the one that holds 'userdata'), or None."""
+    for raw in STEAM_ROOTS:
+        root = Path(raw).expanduser()
+        if (root / "userdata").is_dir():
+            return root.resolve()
+    return None
+
+
+def find_steam_library(prefix):
+    """Find the Steam library containing the configured Proton prefix."""
+    prefix = Path(prefix).expanduser().resolve()
+
+    if prefix.name != "pfx" or prefix.parent.name != "999999":
+        logger.error(f"- [Unexpected Proton prefix layout: {prefix}]")
+        return None
+
+    library = prefix.parent.parent.parent.parent
+
+    if not (library / "steamapps").is_dir():
+        logger.error(f"- [Steam library not found: {library}]")
+        return None
+
+    return library
+
+
+def link_directory(link, target):
+    """Make `link` a symlink to `target`. A real directory already at `link` is renamed to
+    '<name>.bak' first. Returns True on success."""
+    link, target = Path(link), Path(target)
+    try:
+        if link.is_symlink():
+            if link.resolve() == target.resolve():
+                return True
+            link.unlink()
+        elif link.exists():
+            link.rename(link.with_name(link.name + ".bak"))
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(target, target_is_directory=True)
+    except OSError as error:
+        logger.error(f"- [Could not link '{link}' to '{target}': {error}]")
+        return False
+    logger.info(f"- [Linked '{link}' -> '{target}']")
+    return True
 
 
 def runner_dirs(runners_dir):
     """Folders that may hold GE-Proton: Steam's (only if Steam is installed), then ours."""
-    steam_dirs = [Path(d).expanduser() for d in STEAM_RUNNER_DIRS] if steam_installed() else []
-    return steam_dirs + [Path(runners_dir)]
+    STEAM_ROOTS = [Path(d).expanduser() for d in STEAM_RUNNER_DIRS] if steam_installed() else []
+    return STEAM_ROOTS + [Path(runners_dir)]
 
 
 def find_ge_proton(runners_dir, name=None):
@@ -249,7 +328,7 @@ def steam_default_prefix_dir():
     A Proton prefix is typically under compatdata/<appid>/pfx; when the project leaves
     the default unset, use Steam's default compatdata layout rather than a hardcoded TOML path.
     """
-    for root in STEAM_DIRS:
+    for root in STEAM_ROOTS:
         steam_root = Path(root).expanduser()
         if steam_root.exists():
             return (steam_root / "compatdata" / "999999" / "pfx").resolve()

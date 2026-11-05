@@ -105,7 +105,8 @@ variant = "clean"
 filename = "clean_hud.7z"
 url = "https://github.com/gtair/filehost-1/releases/download/v1.38/clean_hud.7z"
 md5 = "9261b48994c85707383cef1ccf8e5e97"
-dest = "{wine_prefix_dir}/drive_c/mo2/mods"
+dest = "{wine_prefix_dir}/drive_c/anomaly"
+strip_components = 1
 
 
 [[artifacts]]
@@ -115,4 +116,5 @@ variant = "bhs"
 filename = "bhs_hud.7z"
 url = "https://github.com/gtair/filehost-1/releases/download/v1.38/bhs_hud.7z"
 md5 = "88544192fbf20e465fef7e7434e6cdb2"
-dest = "{wine_prefix_dir}/drive_c/mo2/mods"
+dest = "{wine_prefix_dir}/drive_c/anomaly"
+strip_components = 1

@@ -1,6 +1,7 @@
 import requests
 from zona.core.log import logger
-from zona.setup import download, hash_verification, path_ops
+from zona.download import download
+from zona.setup import hash_verification, path_ops
 
 
 def ensure_proton(artifacts, paths):

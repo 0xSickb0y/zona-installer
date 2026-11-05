@@ -6,8 +6,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
-from zona.setup import path_ops, runner
 from zona.core.log import logger
+from zona.setup import path_ops, runner
 
 
 def is_torrent_source(url):
@@ -71,8 +71,7 @@ def normalize_ge_proton_artifact_names(artifacts):
                     del artifact["filename"]
 
 
-# TODO: use --hud and --exes options to filter artifacts for download
-def download_archives(artifacts, ARCHIVES_DIR, hud=None, exes=None):
+def download_archives(artifacts, ARCHIVES_DIR):
     """Download every missing archive.
     Returns (ok, results), results = {"Found": [...], "Downloaded": [...], "Failed": [...]}."""
     normalize_ge_proton_artifact_names(artifacts)
@@ -90,7 +89,7 @@ def download_archives(artifacts, ARCHIVES_DIR, hud=None, exes=None):
             logger.error(f"- [Failed to fetch {item['filename']}: {error}]")
             results["Failed"].append(item["filename"])
     return (not results["Failed"], results)
- 
+
 
 def download_artifact(artifact, ARCHIVES_DIR):
     """Download the missing files of one artifact (single file or multipart).
@@ -107,8 +106,7 @@ def download_artifact(artifact, ARCHIVES_DIR):
     return (not failed, failed)
 
 
-# TODO: use --hud and --exes options to filter artifacts for download
-def select_artifacts_for_download(artifacts, ARCHIVES_DIR, hud=None, exes=None):
+def select_artifacts_for_download(artifacts, ARCHIVES_DIR):
     """
     check if "filename" already exists on the .zona_archives directory, if not download it.
     """

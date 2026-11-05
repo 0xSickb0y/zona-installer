@@ -46,6 +46,20 @@ def cli_arguments():
 
     sub = parser.add_subparsers(dest="command", metavar="<command>")
 
+    download_parser = argparse.ArgumentParser(add_help=False)
+    download_parser.add_argument(
+        "-a", "--archives-dir",
+        metavar="DIR",
+        help="Where downloaded archives are stored (default: archives_dir from config.toml)",
+    )
+
+    sub.add_parser(
+        "download",
+        parents=[download_parser],
+        help="Download and verify the archive set without setting up the prefix",
+        description="Fetch the ZONA archives and validate their checksums without creating the Proton prefix or installing the modpack.",
+    )
+
     sub.add_parser(
         "setup",
         parents=[common],
@@ -53,11 +67,16 @@ def cli_arguments():
         description="Download archives and create the install directories and base folder structure.",
     )
 
-    sub.add_parser(
+    install_parser = sub.add_parser(
         "install",
         parents=[common],
         help="Download and install the modpack",
         description="Verify and install the ZONA modpack.",
+    )
+    install_parser.add_argument(
+        "--steam",
+        action="store_true",
+        help="Also add Mod Organizer 2 to the Steam library"
     )
 
     sub.add_parser(
@@ -89,6 +108,13 @@ def cli_arguments():
         parents=[mo2_parser],
         help="Install or validate just Mod Organizer 2 in the Proton prefix",
         description="Ensure the MO2 installation exists without re-running the full modpack install flow.",
+    )
+
+    sub.add_parser(
+        "steam",
+        parents=[mo2_parser],
+        help="Add Mod Organizer 2 to the Steam library as a non-Steam game",
+        description="Add ZONA's Mod Organizer 2 to the Steam library, forced to GE-Proton and using the installed prefix. Steam must be closed.",
     )
 
     args = parser.parse_args()

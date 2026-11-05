@@ -43,8 +43,8 @@ def run(paths, modpack_source):
                 "Anomaly has not generated its runtime files yet. Launch it once to create them, then close it and return here? [Y/n] >>>",
                 default=True,
             ):
-                logger.info("- [Skipped Anomaly launch; MO2 may need the first-run files generated later]")
-            elif not runner.run_exe(dest / GAME_EXE, dest, paths["wine_prefix_dir"], paths["runners_dir"]):
+                logger.info("- [Skipped Anomaly launch; MO2 may need the first-run files generated later]")    
+            elif not runner.run_exe(dest / GAME_EXE, dest, paths["wine_prefix_dir"], paths["runners_dir"], suppress_output=True): # TODO: --verbose option removes suppress_output=True
                 logger.error("- [Could not launch the game, aborting]")
                 raise SystemExit(1)
 
@@ -60,6 +60,18 @@ def run(paths, modpack_source):
                 raise SystemExit(1)
 
         clear_shader_cache(dest)
+
+        hud_artifact = selected_hud_variant()
+        if hud_artifact["variant"] == "clean":
+            logger.warning(
+                "- [Clean HUD requires using the SSS23.5 profile in mo2]"
+            )
+
+        if not backup_runtime_config_files(dest):
+            logger.error("- [Could not back up  'user.ltx' and 'axr_options.ltx']")
+
+        if not extract.extract_artifact(ARTIFACTS, hud_artifact["id"], paths):
+            logger.info("- [Skipped extraction of the selected HUD variant]")
 
         mo2_dir = Path(paths["wine_prefix_dir"]) / "drive_c" / "mo2"
         if mo2_installed(mo2_dir):
@@ -92,14 +104,16 @@ def run(paths, modpack_source):
             logger.error("- [Could not write the Mod Organizer 2 config files, aborting]")
             raise SystemExit(1)
 
+
+
         completed = True
     finally:
         if completed:
             duration = time.perf_counter() - start
             print()
             logger.info(f"- [zona install completed in {duration:.2f}s]")
-            # print(f"- [Mod Organizer 2 profile to use: '{profile_name}']") # TODO: choose based on hardware detection
             print("Installation completed. Good Hunting S.T.A.L.K.E.R.!")
+            print("run: 'zona mo2' to launch Mod Organizer 2.\n")
 
 
 # TODO: move to proper module
@@ -108,6 +122,42 @@ def selected_exes_variant():
     choices = TOML_CONFIG["choices"]
     chosen = choices["exes"]["default"]
     return next(a for a in ARTIFACTS if a.get("group") == "exes" and a.get("variant") == chosen)
+
+
+# TODO: move to proper module
+def selected_hud_variant():
+    """Return the chosen HUD artifact for the current install."""
+    choices = TOML_CONFIG["choices"]
+    chosen = choices["hud"]["default"]
+    return next(a for a in ARTIFACTS if a.get("group") == "hud" and a.get("variant") == chosen)
+
+
+# TODO: move to proper module
+def backup_runtime_config_files(game_dir):
+    """Back up critical Anomaly config files before applying modded EXEs or HUD overlays."""
+    files = [
+        Path(game_dir) / "appdata" / "user.ltx",
+        Path(game_dir) / "gamedata" / "configs" / "axr_options.ltx",
+    ]
+
+    for file_path in files:
+        if not file_path.exists():
+            logger.info(f"- [No runtime config found at '{file_path}', skipping backup]")
+            continue
+
+        backup_path = Path(str(file_path) + ".bak")
+        if backup_path.exists():
+            logger.info(f"- [Backup already exists at '{backup_path}', keeping it]")
+            continue
+
+        try:
+            shutil.copy2(file_path, backup_path)
+            logger.info(f"- [Backed up '{file_path}' to '{backup_path}']")
+        except OSError as error:
+            logger.error(f"- [Could not back up '{file_path}': {error}]")
+            return False
+
+    return True
 
 
 # TODO: move to proper module

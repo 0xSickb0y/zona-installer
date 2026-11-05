@@ -110,14 +110,17 @@ def get_proton(runners_dir):
     return proton
 
 
-def proton_env(WINE_PREFIX_DIR):
-    """Environment for running things in the prefix through GE-Proton.
-    Proton keeps its prefix in '<compat data path>/pfx', so the compat path is the parent."""
-    compat_dir = WINE_PREFIX_DIR.parent
+def proton_env(WINE_PREFIX_DIR, STEAM_ROOT):
+    """Environment for running applications through GE-Proton."""
+    pfx = Path(WINE_PREFIX_DIR).resolve()
+
+    if pfx.name != "pfx":
+        pfx = pfx / "pfx"
+
     return {
         **os.environ,
-        "STEAM_COMPAT_DATA_PATH": str(compat_dir),
-        "STEAM_COMPAT_CLIENT_INSTALL_PATH": str(compat_dir.parent),
+        "STEAM_COMPAT_DATA_PATH": str(pfx.parent),
+        "STEAM_COMPAT_CLIENT_INSTALL_PATH": str(Path(STEAM_ROOT).resolve()),
     }
 
 
@@ -173,7 +176,7 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, runners_dir):
         return False
 
     env = {
-        **proton_env(WINE_PREFIX_DIR),
+        **proton_env(WINE_PREFIX_DIR, STEAM_ROOT=Path(runners_dir).parent),
         "WINEPREFIX": str(WINE_PREFIX_DIR),
         "WINE": str(wine),
         "WINESERVER": str(wine.with_name("wineserver")),
@@ -236,27 +239,12 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, runners_dir):
     return not failed
 
 
+def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, runners_dir, suppress_output=False):
+    """Run a Windows executable through GE-Proton with the app folder as cwd.
 
-# def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, runners_dir):
-#     """Run a Windows executable through GE-Proton. Returns False only if it could not be started."""
-#     proton = get_proton(runners_dir)
-#     if proton is None:
-#         return False
-
-#     logger.info(f"- [Launching via GE-Proton: {exe_path.name}]")
-#     try:
-#         result = subprocess.run(
-#             [str(proton), "run", str(exe_path)],
-#             env=proton_env(WINE_PREFIX_DIR), cwd=working_dir,
-#         )
-#     except OSError as error:
-#         logger.error(f"- [Could not run GE-Proton: {error}]")
-#         return False
-#     logger.info(f"- [{exe_path.name} exited with code {result.returncode}]")
-#     return True
-
-def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, runners_dir):
-    """Run a Windows executable through GE-Proton with the app folder as cwd."""
+    `suppress_output` quiets Proton stdout/stderr when the caller doesn't want the runtime
+    noise; `--verbose` can be added later without changing the function signature.
+    """
     proton = get_proton(runners_dir)
     if proton is None:
         return False
@@ -265,11 +253,13 @@ def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, runners_dir):
     working_dir = Path(working_dir)
 
     logger.info(f"- [Launching via GE-Proton: {exe_path.name}]")
+    extra = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL} if suppress_output else {}
     try:
         result = subprocess.run(
             [str(proton), "run", str(exe_path)],
             env=proton_env(WINE_PREFIX_DIR),
             cwd=str(working_dir),
+            **extra,
         )
     except OSError as error:
         logger.error(f"- [Could not run GE-Proton: {error}]")

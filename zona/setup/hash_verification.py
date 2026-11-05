@@ -15,7 +15,9 @@ def verify_archives(artifacts, ARCHIVES_DIR):
             expected = item.get("md5")
             try:
                 if filename.lower().endswith(".sha512sum"):
-                    status = Path(file_path).exists()
+                    status = Path(file_path).is_file()
+                    if not status:
+                        status = None
                 elif expected:
                     status = verify_md5(file_path, expected)
                 else:
