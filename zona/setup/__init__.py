@@ -233,12 +233,17 @@ def run(paths, skip_archive_cleanup=False):
             logger.error("- [Could not set up 7z, aborting]")
             raise SystemExit(1)
 
-        # 10. Create Wine/Proton prefix
+        # 10. Setup winetricks
+        if not runner.setup_winetricks():
+            logger.error("- [Could not set up winetricks, aborting]")
+            raise SystemExit(1)
+
+        # 11. Create Wine/Proton prefix
         if not runner.create_prefix(WINE_PREFIX_DIR, RUNNERS_DIR):
             logger.error("- [Could not set up wine prefix, aborting]")
             raise SystemExit(1)
 
-        # 11. Install prefix components
+        # 12. Install prefix components
         if not runner.install_components(
             WINE_PREFIX_DIR, WINE_COMPONENTS, RUNNERS_DIR
         ):

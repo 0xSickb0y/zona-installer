@@ -290,6 +290,11 @@ def find_protontricks():
     return shutil.which("protontricks")
 
 
+def find_winetricks():
+    """Path to winetricks, or None if it is not installed."""
+    return shutil.which("winetricks")
+
+
 def protontricks_installed():
     """True if protontricks is on the PATH."""
     return shutil.which("protontricks") is not None

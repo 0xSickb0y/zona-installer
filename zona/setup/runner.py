@@ -24,6 +24,17 @@ PROTONTRICKS_COMMANDS = {
 }
 
 
+WINETRICKS_COMMANDS = {
+    "apt": [
+        ["sudo", "apt", "update"],
+        ["sudo", "apt", "install", "-y", "winetricks"],
+    ],
+    "pacman": [["sudo", "pacman", "-S", "--needed", "--noconfirm", "winetricks"]],
+    "dnf": [["sudo", "dnf", "install", "-y", "winetricks"]],
+    "zypper": [["sudo", "zypper", "--non-interactive", "install", "winetricks"]],
+}
+
+
 SEVENZIP_COMMANDS = {
     "apt": [
         ["sudo", "apt", "update"],
@@ -78,6 +89,19 @@ def setup_aria2c():
         logger.error("- [aria2c is required for magnet and torrent downloads]")
         return False
     return install_packages(ARIA2_COMMANDS, "aria2c")
+
+
+def setup_winetricks():
+    """Make sure winetricks is available, offering to install it. Returns True if it is."""
+    if path_ops.find_winetricks():
+        logger.info("- [winetricks found]")
+        return True
+
+    logger.warning("- [winetricks is not found]")
+    if not utils.yes_or_no("Install winetricks now? [Y/n] >>> ", default=True):
+        logger.error("- [winetricks is required to install the prefix components]")
+        return False
+    return install_packages(WINETRICKS_COMMANDS, "winetricks")
 
 
 def install_packages(commands_by_manager, package_label="packages"):
@@ -151,7 +175,8 @@ def create_prefix(WINE_PREFIX_DIR, runners_dir):
     try:
         result = subprocess.run(
             [str(proton), "run", "wineboot", "-u"],
-            env=proton_env(WINE_PREFIX_DIR), capture_output=True, text=True,
+            env=proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(runners_dir).parent),
+            capture_output=True, text=True,
         )
     except OSError as error:
         logger.error(f"- [Could not run GE-Proton: {error}]")
@@ -176,7 +201,7 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, runners_dir):
         return False
 
     env = {
-        **proton_env(WINE_PREFIX_DIR, STEAM_ROOT=Path(runners_dir).parent),
+        **proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(runners_dir).parent),
         "WINEPREFIX": str(WINE_PREFIX_DIR),
         "WINE": str(wine),
         "WINESERVER": str(wine.with_name("wineserver")),
@@ -257,7 +282,7 @@ def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, runners_dir, suppress_output
     try:
         result = subprocess.run(
             [str(proton), "run", str(exe_path)],
-            env=proton_env(WINE_PREFIX_DIR),
+            env=proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(runners_dir).parent),
             cwd=str(working_dir),
             **extra,
         )
