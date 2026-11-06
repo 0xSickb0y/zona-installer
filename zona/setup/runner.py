@@ -2,10 +2,11 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from zona.core import utils
 from zona.setup import path_ops
 from zona.core.log import logger
+from zona.core import utils, config
 
+DLL_OVERRIDES = config.read_toml_configs()["wine"].get("dll_overrides", "")
 
 PROTONTRICKS_COMMANDS = {
     "apt": [
@@ -141,11 +142,14 @@ def proton_env(WINE_PREFIX_DIR, STEAM_ROOT):
     if pfx.name != "pfx":
         pfx = pfx / "pfx"
 
-    return {
+    env = {
         **os.environ,
         "STEAM_COMPAT_DATA_PATH": str(pfx.parent),
         "STEAM_COMPAT_CLIENT_INSTALL_PATH": str(Path(STEAM_ROOT).resolve()),
     }
+    if DLL_OVERRIDES:
+        env["WINEDLLOVERRIDES"] = DLL_OVERRIDES
+    return env
 
 
 def setup_protontricks():

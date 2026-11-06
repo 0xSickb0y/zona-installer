@@ -25,13 +25,11 @@ def select_artifacts(artifacts, choices, hud=None, exes=None):
 
 
 def existing_install_detected(paths):
-    """True if the prefix already contains the core install state we care about."""
-    wine_prefix = Path(paths["wine_prefix_dir"])
-    if not wine_prefix.exists():
-        return False
-
-    anomaly_dir = wine_prefix / "drive_c" / "anomaly"
-    mo2_dir = wine_prefix / "drive_c" / "mo2"
+    """True if the install folder already contains the core install state we care about."""
+    anomaly = next(a for a in ARTIFACTS if a["id"] == "anomaly")
+    mo2 = next(a for a in ARTIFACTS if a["id"] == "mo2")
+    anomaly_dir = Path(anomaly["dest"].format(**paths))
+    mo2_dir = Path(mo2["dest"].format(**paths))
     profiles_dir = mo2_dir / "profiles"
     mods_dir = mo2_dir / "mods"
 

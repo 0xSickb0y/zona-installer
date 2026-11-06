@@ -1,12 +1,13 @@
 import re
-import subprocess
-import zlib
-from pathlib import Path
-
 import vdf
-
+import zlib
+import subprocess
+from pathlib import Path
 from zona.core.log import logger
-from zona.setup import path_ops
+from zona.install import ARTIFACTS
+from zona.setup import path_ops, runner
+
+
 
 SHORTCUT_NAME = "S.T.A.L.K.E.R.: ZONA"  # title shown in the Steam library
 
@@ -24,7 +25,7 @@ def shortcut_appid(exe, name):
     return zlib.crc32(f'"{exe}"{name}'.encode()) | 0x80000000
 
 
-def add_shortcut(shortcuts_file, name, exe, start_dir):
+def add_shortcut(shortcuts_file, name, exe, start_dir, launch_options):
     """Add the shortcut to a user's shortcuts.vdf, or refresh it if one with this name exists."""
     appid = shortcut_appid(exe, name)
     raw = shortcuts_file.read_bytes() if shortcuts_file.exists() else b""
@@ -46,6 +47,7 @@ def add_shortcut(shortcuts_file, name, exe, start_dir):
         "appname": name,
         "exe": f'"{exe}"',
         "StartDir": f'"{start_dir}"',
+        "LaunchOptions": launch_options,
     })
 
     shortcuts_file.parent.mkdir(parents=True, exist_ok=True)
@@ -112,8 +114,10 @@ def add_to_library(paths):
         logger.error(f"- [Could not locate Proton pfx/drive_c inside '{prefix_path}']")
         return False
 
-    compat_data_target = pfx.parent
-    mo2_dir = pfx / "drive_c" / "mo2"
+    mo2 = next(a for a in ARTIFACTS if a["id"] == "mo2")
+    anomaly = next(a for a in ARTIFACTS if a["id"] == "anomaly")
+    mo2_dir = Path(mo2["dest"].format(**paths))
+    anomaly_dir = Path(anomaly["dest"].format(**paths))
 
     if not path_ops.verify_existing_file("ModOrganizer.exe", INSTALL_DIR=mo2_dir):
         logger.error(f"- [ModOrganizer.exe not found inside '{mo2_dir}']")
@@ -133,12 +137,13 @@ def add_to_library(paths):
 
     # the shortcut itself, for every Steam account
     appid = shortcut_appid(exe, SHORTCUT_NAME)
+    launch_options = f'WINEDLLOVERRIDES="{runner.DLL_OVERRIDES}" %command%' if runner.DLL_OVERRIDES else ""
     for user in users:
         shortcuts_file = user / "config" / "shortcuts.vdf"
         if shortcuts_file.exists():
             path_ops.backup_file(shortcuts_file)
         try:
-            add_shortcut(shortcuts_file, SHORTCUT_NAME, exe, mo2_dir)
+            add_shortcut(shortcuts_file, SHORTCUT_NAME, exe, mo2_dir, launch_options)
         except (OSError, SyntaxError, ValueError) as error:
             logger.error(f"- [Could not update '{shortcuts_file}': {error}]")
             return False
@@ -156,45 +161,49 @@ def add_to_library(paths):
         logger.error(f"- [Could not update '{config_vdf}': {error}]")
         return False
 
-    # Let Steam use the existing ZONA prefix.
-    library = path_ops.find_steam_library(pfx)
-
-    if library is None:
+    # Verify the Anomaly folder.
+    if not anomaly_dir.is_dir():
+        logger.error(f"- [Anomaly folder missing: {anomaly_dir}]")
         return False
 
-    compatdata = library / "steamapps" / "compatdata"
-    shortcut_compatdata = compatdata / str(appid)
-
-    # TODO: tmp debug
-    logger.info(f"- [Steam library: {library}]")
-    logger.info(f"- [Shortcut compatdata: {shortcut_compatdata}]")
-
-    # Verify the original prefix before linking.
-    for folder in ("anomaly", "mo2"):
-        path = pfx / "drive_c" / folder
-
-        if not path.is_dir():
-            logger.error(f"- [ZONA C:\\{folder} missing: {path}]")
-            return False
-
-    # Link the existing prefix to the shortcut's AppID.
-    if pfx.parent != shortcut_compatdata:
-        if not path_ops.link_directory(shortcut_compatdata, pfx.parent):
-            return False
-
-    # Verify Steam sees the existing Windows filesystem.
-    steam_prefix = shortcut_compatdata / "pfx"
-
-    for folder in ("anomaly", "mo2"):
-        path = steam_prefix / "drive_c" / folder
-
-        if path.is_dir():
-            logger.info(f"- [Steam C:\\{folder} found]")
-        else:
-            logger.error(f"- [Steam C:\\{folder} missing: {path}]")
-            return False
-
     logger.info("- [ZONA prefix successfully connected to Steam]")
-
     logger.info(f"- [Done. Start Steam: '{SHORTCUT_NAME}' is in your library]")
     return True
+
+
+def find_library(path):
+    """The Steam library folder that contains `path`, or None.
+    Valid means: listed in Steam's libraryfolders.vdf and has a 'steamapps' folder."""
+    root = path_ops.find_steam_root()
+    if root is None:
+        logger.error("- [Steam install not found]")
+        return None
+
+    vdf_file = root / "steamapps" / "libraryfolders.vdf"
+    try:
+        folders = vdf.loads(vdf_file.read_text(encoding="utf-8"))["libraryfolders"]
+    except (OSError, SyntaxError, KeyError) as error:
+        logger.error(f"- [Could not read '{vdf_file}': {error}]")
+        return None
+
+    path = Path(path).resolve()
+    for folder in folders.values():
+        if not isinstance(folder, dict) or "path" not in folder:
+            continue
+        library = Path(folder["path"]).resolve()
+        if path.is_relative_to(library) and (library / "steamapps").is_dir():
+            return library
+    return None
+
+
+def shortcut_prefix(paths):
+    """The prefix Steam will use for the ZONA shortcut, or None:
+    <Steam root>/steamapps/compatdata/<appid>/pfx"""
+    root = path_ops.find_steam_root()
+    if root is None:
+        logger.error("- [Steam install not found]")
+        return None
+    mo2 = next(a for a in ARTIFACTS if a["id"] == "mo2")
+    exe = Path(mo2["dest"].format(**paths)) / "ModOrganizer.exe"
+    appid = shortcut_appid(exe, SHORTCUT_NAME)
+    return root / "steamapps" / "compatdata" / str(appid) / "pfx"

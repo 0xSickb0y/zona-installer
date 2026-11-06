@@ -214,23 +214,6 @@ def find_steam_root():
     return None
 
 
-def find_steam_library(prefix):
-    """Find the Steam library containing the configured Proton prefix."""
-    prefix = Path(prefix).expanduser().resolve()
-
-    if prefix.name != "pfx" or prefix.parent.name != "999999":
-        logger.error(f"- [Unexpected Proton prefix layout: {prefix}]")
-        return None
-
-    library = prefix.parent.parent.parent.parent
-
-    if not (library / "steamapps").is_dir():
-        logger.error(f"- [Steam library not found: {library}]")
-        return None
-
-    return library
-
-
 def link_directory(link, target):
     """Make `link` a symlink to `target`. A real directory already at `link` is renamed to
     '<name>.bak' first. Returns True on success."""

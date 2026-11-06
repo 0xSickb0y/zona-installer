@@ -2,14 +2,15 @@ import time
 from pathlib import Path
 from zona.setup import runner
 from zona.core.log import logger
-from zona.install import mo2_installed, profiles_installed, modpack_installed
+from zona.install import ARTIFACTS, mo2_installed, profiles_installed, modpack_installed
 
 
 def run(paths):
     start = time.perf_counter()
     completed = False
     try:
-        MO2_DIR = Path(paths["wine_prefix_dir"]) / "drive_c" / "mo2"
+        _mo2 = next(a for a in ARTIFACTS if a["id"] == "mo2")
+        MO2_DIR = Path(_mo2["dest"].format(**paths))
         MO2_PATH = MO2_DIR / "ModOrganizer.exe"
         WINE_PREFIX_DIR = paths["wine_prefix_dir"]
 

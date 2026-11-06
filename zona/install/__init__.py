@@ -35,7 +35,7 @@ def run(paths, modpack_source):
             logger.error(f"- [{GAME_EXE} not found inside '{dest}', aborting]")
             raise SystemExit(1)
 
-        if anomaly_runtime_files_present(paths["wine_prefix_dir"]):
+        if anomaly_runtime_files_present(dest):
             logger.info("- [Anomaly runtime files already present; no first-launch step required]")
         else:
             logger.info("- [Launching Anomaly once to generate the runtime files needed by MO2]")
@@ -49,7 +49,7 @@ def run(paths, modpack_source):
                 raise SystemExit(1)
 
         exes_artifact = selected_exes_variant()
-        exes_target = Path(paths["wine_prefix_dir"]) / "drive_c" / "anomaly" / "db" / "mods" / "00_modded_exes_gamedata.db0"
+        exes_target = dest / "db" / "mods" / "00_modded_exes_gamedata.db0"
         if exes_target.exists():
             logger.info(f"- [Modded exes already installed in '{exes_target.parent}', skipping extraction]")
         else:
@@ -73,7 +73,8 @@ def run(paths, modpack_source):
         if not extract.extract_artifact(ARTIFACTS, hud_artifact["id"], paths):
             logger.info("- [Skipped extraction of the selected HUD variant]")
 
-        mo2_dir = Path(paths["wine_prefix_dir"]) / "drive_c" / "mo2"
+        mo2 = next(a for a in ARTIFACTS if a["id"] == "mo2")
+        mo2_dir = Path(mo2["dest"].format(**paths))
         if mo2_installed(mo2_dir):
             logger.info(f"- [Mod Organizer 2 already installed in '{mo2_dir}', skipping extraction]")
         elif not extract.extract_artifact(ARTIFACTS, "mo2", paths):
@@ -96,15 +97,12 @@ def run(paths, modpack_source):
 
         print()
         logger.info("- [Writing ModOrganizer2 .INI Files]")
-        mo2_dir = Path(paths["wine_prefix_dir"]) / "drive_c" / "mo2"
         profile_name = default_profile_name(mo2_dir)
         if mo2_ini_files_present(mo2_dir) and not confirm_rewrite_ini(mo2_dir):
             logger.info(f"- [Keeping the existing MO2 INI files in '{mo2_dir}']")
-        elif not write_mo2_configs(mo2_dir, profile_name):
+        elif not write_mo2_configs(mo2_dir, dest, profile_name):
             logger.error("- [Could not write the Mod Organizer 2 config files, aborting]")
             raise SystemExit(1)
-
-
 
         completed = True
     finally:
@@ -236,38 +234,31 @@ def modpack_installed(mo2_dir):
 
 
 # TODO: move to proper module
-def anomaly_runtime_files_present(wine_prefix_dir):
-    """True if the first-run Anomaly runtime markers exist in the prefix."""
-    drive_c = Path(wine_prefix_dir) / "drive_c"
-    anomaly_dirs = [drive_c / "Anomaly", drive_c / "anomaly"]
-
-    for anomaly_dir in anomaly_dirs:
-        if not anomaly_dir.exists():
-            continue
-        candidate_files = [
-            anomaly_dir / "appdata" / "user.ltx",
-            anomaly_dir / "logs",
-        ]
-        if any(path.exists() for path in candidate_files):
-            return True
-
-    return False
+def anomaly_runtime_files_present(anomaly_dir):
+    """True if the first-run Anomaly runtime markers exist in the Anomaly folder."""
+    anomaly_dir = Path(anomaly_dir)
+    return (anomaly_dir / "appdata" / "user.ltx").exists() or (anomaly_dir / "logs").exists()
 
 
 # TODO: move to proper module
-def write_mo2_configs(mo2_dir, profile_name):
-    """Write ModOrganizer.ini and nxmhandler.ini into the MO2 folder."""
+def write_mo2_configs(mo2_dir, anomaly_dir, profile_name):
+    """Write ModOrganizer.ini and nxmhandler.ini into the MO2 folder.
+    Paths use Wine's Z: drive, so MO2 finds them in any prefix."""
+    game = "Z:" + str(Path(anomaly_dir).resolve())
+    mo2 = "Z:" + str(Path(mo2_dir).resolve())
+    game_win = game.replace("/", "\\")
+    game_bytearray = game_win.replace("\\", "\\\\")
     values = {
         "PROFILE_NAME": profile_name,
         "PROFILE_NAME_BYTEARRAY": f"@ByteArray({profile_name})",
-        "GAME_PATH": "C:/anomaly",
-        "GAME_PATH_WIN": "C:\\anomaly",
-        "GAME_PATH_BYTEARRAY": "@ByteArray(C:\\\\anomaly)",
-        "ANOMALY_LAUNCHER": "C:/anomaly/AnomalyLauncher.exe",
-        "ANOMALY_BIN": "C:/anomaly/bin",
-        "EXPLORER_BIN": "C:/mo2/explorer++/Explorer++.exe",
-        "EXPLORER_DIR": "C:/mo2/explorer++",
-        "RECENT_DIR": "C:/anomaly/bin",
+        "GAME_PATH": game,
+        "GAME_PATH_WIN": game_win,
+        "GAME_PATH_BYTEARRAY": f"@ByteArray({game_bytearray})",
+        "ANOMALY_LAUNCHER": f"{game}/AnomalyLauncher.exe",
+        "ANOMALY_BIN": f"{game}/bin",
+        "EXPLORER_BIN": f"{mo2}/explorer++/Explorer++.exe",
+        "EXPLORER_DIR": f"{mo2}/explorer++",
+        "RECENT_DIR": f"{game}/bin",
     }
     files = {
         "ModOrganizer.ini": "ModOrganizer.ini",
