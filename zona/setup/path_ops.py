@@ -159,6 +159,11 @@ def expand_var_and_user(raw_path):
     return expanded_path
     
 
+def is_partial_download(filename, ARCHIVES_DIR):
+    """True if aria2c left a control file next to the archive, i.e. the torrent is incomplete."""
+    return os.path.exists(os.path.join(ARCHIVES_DIR, f"{filename}.aria2"))
+
+
 def verify_existing_file(filename, ARCHIVES_DIR=None, INSTALL_DIR=None):
     """Could be used for both download and install.
 
@@ -183,7 +188,7 @@ def clean_directory(path):
     print()
 
 
-def save_archive_to_dest(filename, ARCHIVES_DIR, response):
+def save_archive_to_dest(filename, ARCHIVES_DIR, response, on_chunk=None):
     """Stream a download to ARCHIVES_DIR/filename.
 
     Writes to 'filename.part' first and renames it once the download is
@@ -195,6 +200,8 @@ def save_archive_to_dest(filename, ARCHIVES_DIR, response):
     with open(tmp_path, "wb") as f:
         for chunk in response.iter_content(chunk_size=1024 * 1024):
             f.write(chunk)
+            if on_chunk is not None:
+                on_chunk(len(chunk))
     os.replace(tmp_path, dest_path)
 
 

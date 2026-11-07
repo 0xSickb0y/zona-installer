@@ -11,6 +11,9 @@ dependencies = ["requests", "vdf"]
 [project.scripts]
 zona = "zona.main:main"
 
+[tool.setuptools.packages.find]
+include = ["zona*"]
+
 [tool.setuptools.package-data]
 zona = [
     "config.toml",

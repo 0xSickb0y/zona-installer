@@ -3,7 +3,7 @@ from pathlib import Path
 from zona.core import config
 from zona.core.log import logger
 from zona.download import download as download_module
-from zona.setup import hash_verification, modpack, path_ops, runner, proton
+from zona.setup import modpack, path_ops, runner, proton
 
 # Backwards-compatible import for internal code that still expects zona.setup.download
 # while the implementation lives under zona.download.
@@ -50,6 +50,7 @@ def run(paths, skip_archive_cleanup=False):
         ARCHIVES_DIR = paths["archives_dir"]
         WINE_PREFIX_DIR = paths["wine_prefix_dir"]
         RUNNERS_DIR = paths["runners_dir"]
+        config.resolve_alternatives(ARTIFACTS, ARCHIVES_DIR)
 
         SELECTED_ARTIFACTS = [
             a for a in select_artifacts(
@@ -65,15 +66,9 @@ def run(paths, skip_archive_cleanup=False):
                 "- [Existing installation detected; skipping archive download]"
             )
 
-            modpack_source = modpack.ensure_modpack(
+            modpack_source = modpack.choose_source(
                 SELECTED_ARTIFACTS, ARCHIVES_DIR
             )
-
-            if modpack_source is None:
-                modpack_source = next(
-                    a["id"] for a in SELECTED_ARTIFACTS
-                    if a.get("one_of") == "modpack"
-                )
 
             to_verify = [
                 a for a in SELECTED_ARTIFACTS
@@ -85,118 +80,51 @@ def run(paths, skip_archive_cleanup=False):
             checksum_results = None
 
         else:
-            # 1. Download archives
-            download_ok, download_results = download.download_archives(
+            # 1. Pick the modpack source from what is on disk (no hashing yet)
+            modpack_source = modpack.choose_source(
                 SELECTED_ARTIFACTS, ARCHIVES_DIR
             )
-
-            if not download_ok:
-                failed_downloads = download_results["Failed"]
-
-                logger.error(
-                    f"- [Failed downloads ({len(failed_downloads)})]"
-                )
-
-                for filename in failed_downloads:
-                    print(f"{'':9} - {filename}")
-
-                raise SystemExit(1)
-
-            # 2. Select modpack
-            modpack_source = modpack.ensure_modpack(
-                SELECTED_ARTIFACTS, ARCHIVES_DIR
-            )
-
-            if modpack_source is None:
-                logger.error(
-                    "- [Could not get a usable modpack archive, aborting]"
-                )
-                raise SystemExit(1)
-
-            logger.info(
-                f"- [Using modpack source: "
-                f"{modpack.describe_source(SELECTED_ARTIFACTS, modpack_source)}]"
-            )
-
-            # 3. Determine artifacts to verify
             to_verify = [
                 a for a in SELECTED_ARTIFACTS
                 if "one_of" not in a or a["id"] == modpack_source
             ]
 
-            # 4. Verify checksums
-            print("\nInitiating MD5 Checksums")
+            if "failed" in path_ops.create_directories((ARCHIVES_DIR,)).values():
+                logger.error("- [Could not prepare the archive directory, aborting]")
+                raise SystemExit(1)
 
-            verify_ok, checksum_results = hash_verification.verify_archives(
+            # 2. Per file: missing -> download, present -> hash, corrupted -> replace (asked once).
+            #    Each fetched file is verified on its own; nothing is hashed twice.
+            verify_ok, checksum_results = download.ensure_archives(
                 to_verify, ARCHIVES_DIR
             )
 
+            # 3. The single modpack archive has no download URL; if it is unusable, use the multipart set.
             if not verify_ok:
-                logger.error(
-                    "- [Checksum verification failed: "
-                    "some archives are missing or corrupted]"
+                modpack_source = modpack.fallback_to_multipart(
+                    SELECTED_ARTIFACTS, ARCHIVES_DIR, modpack_source, checksum_results
                 )
-
-                mismatched = [
-                    name for name, status in checksum_results.items()
-                    if status is False
-                ]
-
-                missing = [
-                    name for name, status in checksum_results.items()
-                    if status is None
-                ]
-
-                if mismatched:
-                    logger.error(
-                        f"- [Checksum mismatch ({len(mismatched)})]"
-                    )
-                    for filename in mismatched:
-                        print(f"{'':9} - {filename}")
-
-                if missing:
-                    logger.error(
-                        f"- [Missing archives ({len(missing)})]"
-                    )
-                    for filename in missing:
-                        print(f"{'':9} - {filename}")
-
-                # 5. Recover modpack if necessary
-                modpack_source = modpack.recover_modpack(
-                    SELECTED_ARTIFACTS,
-                    ARCHIVES_DIR,
-                    modpack_source,
-                    checksum_results,
-                )
-
                 if modpack_source is None:
-                    logger.error(
-                        "- [Could not get a verified modpack archive, aborting]"
-                    )
+                    logger.error("- [Could not get a usable modpack archive, aborting]")
                     raise SystemExit(1)
 
-                # Recovery may have changed the selected modpack.
-                # Rebuild the verification set and verify it again.
                 to_verify = [
                     a for a in SELECTED_ARTIFACTS
                     if "one_of" not in a or a["id"] == modpack_source
                 ]
-
-                verify_ok, checksum_results = (
-                    hash_verification.verify_archives(
-                        to_verify, ARCHIVES_DIR
-                    )
+                verify_ok = all(
+                    checksum_results.get(item["filename"]) is True
+                    for a in to_verify for item in a.get("parts") or [a]
                 )
-
                 if not verify_ok:
-                    logger.error(
-                        "- [Archive verification still failed after recovery]"
-                    )
+                    logger.error("- [Some archives are still missing or corrupted, aborting]")
                     raise SystemExit(1)
 
-            else:
-                logger.info("- [All archives verified]")
-                print()
+            logger.info(
+                f"- [Using modpack source: "
+                f"{modpack.describe_source(SELECTED_ARTIFACTS, modpack_source)}]"
+            )
+            print()
 
         # 6. Verify/preserve archive cache and prepare directories.
         # Reuse checksum results when already available.

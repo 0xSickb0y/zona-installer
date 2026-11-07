@@ -1,7 +1,8 @@
-from zona.core import utils
 from zona.core.log import logger
 from zona.download import download
-from zona.setup import hash_verification, path_ops
+from zona.setup import path_ops
+
+MULTIPART_ID = "zona_modpack"
 
 
 def describe_source(artifacts, source_id):
@@ -25,49 +26,26 @@ def resolve_one_of(artifacts, ARCHIVES_DIR, group):
     return None
 
 
-def ensure_modpack(artifacts, ARCHIVES_DIR):
-    """Id of a modpack source whose files all exist, downloading the multipart set if none does."""
-    source = resolve_one_of(artifacts, ARCHIVES_DIR, "modpack")
-    if source is not None:
-        return source
-
-    logger.warning("- [No modpack archive found, downloading the multipart set]")
-    multipart = next(a for a in artifacts if a["id"] == "zona_modpack")
-    ok, failed = download.download_artifact(multipart, ARCHIVES_DIR)
-    if not ok:
-        logger.error(f"- [Failed downloads ({len(failed)})]")
-        for filename in failed:
-            print(f"{'':9} - {filename}")
-        return None
-    return multipart["id"]
+def choose_source(artifacts, ARCHIVES_DIR):
+    """Pick the modpack source before anything is hashed: whichever source is fully on disk,
+    otherwise the multipart set (the only one with a download URL)."""
+    return resolve_one_of(artifacts, ARCHIVES_DIR, "modpack") or MULTIPART_ID
 
 
-def recover_modpack(artifacts, ARCHIVES_DIR, source_id, checksum_results):
-    """Called after the md5 check. If the chosen modpack source has bad or missing
-    files, offer to download the multipart set. Returns a verified source id, or None."""
+def fallback_to_multipart(artifacts, ARCHIVES_DIR, source_id, results):
+    """Called when the chosen modpack source failed in download.ensure_archives().
+    The single archive can't be re-downloaded, so switch to the multipart set and fetch/verify
+    only its parts. Updates `results`; returns the usable source id, or None."""
     source = next(a for a in artifacts if a["id"] == source_id)
-    names = [i["filename"] for i in source.get("parts") or [source]]
-    bad = [name for name in names if checksum_results.get(name) is not True]
-    if not bad:
+    if all(results.get(i["filename"]) is True for i in source.get("parts") or [source]):
         return source_id
-
-    question = "Download the multipart modpack (bad or missing parts only)? [y/N] >>> "
-    if not utils.yes_or_no(question, default=False):
+    if source_id == MULTIPART_ID:
         return None
 
-    path_ops.remove_files(ARCHIVES_DIR, bad)  # so a bad file is fetched again
-    multipart = next(a for a in artifacts if a["id"] == "zona_modpack")
-    ok, failed = download.download_artifact(multipart, ARCHIVES_DIR)
-    if not ok:
-        logger.error(f"- [Failed downloads ({len(failed)})]")
-        for filename in failed:
-            print(f"{'':9} - {filename}")
-        return None
-
-    # hash only the parts that haven't been verified yet
-    unverified = {"parts": [p for p in multipart["parts"] if checksum_results.get(p["filename"]) is not True]}
-    verify_ok, _ = hash_verification.verify_archives([unverified], ARCHIVES_DIR)
-    if not verify_ok:
-        logger.error("- [The multipart modpack failed verification again]")
-        return None
-    return multipart["id"]
+    logger.warning(f"- [{describe_source(artifacts, source_id)} is unusable, using the multipart modpack instead]")
+    for item in source.get("parts") or [source]:
+        results.pop(item["filename"], None)  # the single archive no longer matters
+    multipart = next(a for a in artifacts if a["id"] == MULTIPART_ID)
+    ok, multipart_results = download.ensure_archives([multipart], ARCHIVES_DIR)
+    results.update(multipart_results)
+    return MULTIPART_ID if ok else None

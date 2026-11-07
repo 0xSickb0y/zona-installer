@@ -25,9 +25,14 @@ exes = { default = "regular",    options = ["regular", "mt"] }
 
 [[artifacts]]
 id = "anomaly"
-filename = "Anomaly-1.5.3-Full.2.7z"
-url = "magnet:?xt=urn:btih:205676f90498f2be3900a3eb0d29b9f50a591fa1&dn=Anomaly-1.5.3-Full.2.7z&tr=udp://bt2.archive.org:6969/announce&tr=udp://tracker.opentrackr.org:1337/announce&tr=udp://bt1.archive.org:6969/announce&tr=udp://tracker.torrent.eu.org:451/announce"
+# Primary = what the torrent produces; aria2c can't rename torrent content, so this must match the torrent.
+filename = "Anomaly-1.5.3-Full.7z"
+url = "magnet:?xt=urn:btih:205676f90498f2be3900a3eb0d29b9f50a591fa1&dn=Anomaly-1.5.3-Full.7z&tr=udp://bt2.archive.org:6969/announce&tr=udp://tracker.opentrackr.org:1337/announce&tr=udp://bt1.archive.org:6969/announce&tr=udp://tracker.torrent.eu.org:451/announce"
 md5 = "d6bce51a4e6d98f9610ef0aa967ba964"
+# Same release under another name (identical md5); used instead of the primary if found in archives_dir
+alternatives = [
+  { filename = "Anomaly-1.5.3-Full.2.7z", md5 = "d6bce51a4e6d98f9610ef0aa967ba964" },  # ModDB
+]
 check_file = "AnomalyLauncher.exe"
 check_md5 = "5410f91807493fafa6c2dda136a324e7"
 dest = "{install_dir}/anomaly"

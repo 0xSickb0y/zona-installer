@@ -19,8 +19,20 @@ class ColorFormatter(logging.Formatter):
         return message
 
 
+class ProgressAwareHandler(logging.StreamHandler):
+    """Clears an active download progress line before writing, so the two never share a line."""
+    def emit(self, record):
+        from zona.core import progress
+        current = progress.active()
+        if current is None:
+            return super().emit(record)
+        with progress.OUTPUT_LOCK:
+            current.clear()
+            super().emit(record)
+
+
 def setup_logging(verbose=False):
-    handler = logging.StreamHandler()
+    handler = ProgressAwareHandler()
     handler.setFormatter(ColorFormatter("%(levelname)-7s %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG if verbose else logging.INFO)

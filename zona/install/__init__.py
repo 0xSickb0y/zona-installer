@@ -19,6 +19,7 @@ def run(paths, modpack_source):
     completed = False
     print("\nStarting Extract and Install process")
     try:
+        config.resolve_alternatives(ARTIFACTS, paths["archives_dir"])
         anomaly = next(a for a in ARTIFACTS if a["id"] == "anomaly")
         dest = Path(anomaly["dest"].format(**paths))
 
@@ -67,10 +68,11 @@ def run(paths, modpack_source):
                 "- [Clean HUD requires using the SSS23.5 profile in mo2]"
             )
 
+        # The HUD replaces Anomaly's own user.ltx / axr_options.ltx: keep the originals first,
+        # then overwrite without asking. Never overwrite them if the backup failed.
         if not backup_runtime_config_files(dest):
-            logger.error("- [Could not back up  'user.ltx' and 'axr_options.ltx']")
-
-        if not extract.extract_artifact(ARTIFACTS, hud_artifact["id"], paths):
+            logger.error("- [Could not back up 'user.ltx' and 'axr_options.ltx', skipping the HUD]")
+        elif not extract.extract_artifact(ARTIFACTS, hud_artifact["id"], paths, overwrite=True):
             logger.info("- [Skipped extraction of the selected HUD variant]")
 
         mo2 = next(a for a in ARTIFACTS if a["id"] == "mo2")

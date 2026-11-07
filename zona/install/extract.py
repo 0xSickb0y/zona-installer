@@ -53,10 +53,11 @@ import tempfile
 from pathlib import Path
 
 
-def extract_archive(filename, ARCHIVES_DIR, dest, strip_components=0):
+def extract_archive(filename, ARCHIVES_DIR, dest, strip_components=0, overwrite=False):
     """Extract ARCHIVES_DIR/filename into dest_dir.
 
-    Optionally strip leading directory components from the archive paths.
+    strip_components=1 drops the archive's single top-level folder ("Bhs Hud/appdata/..." -> "appdata/...").
+    Existing files are only replaced after asking, unless `overwrite` is set (the caller backed them up).
     Returns True on success.
     """
     seven_zip = path_ops.find_7z()
@@ -77,64 +78,44 @@ def extract_archive(filename, ARCHIVES_DIR, dest, strip_components=0):
 
     try:
         if strip_components:
+            if strip_components != 1:
+                logger.error("- [Unsupported strip_components value, aborting]")
+                raise SystemExit(1)
+
             with tempfile.TemporaryDirectory() as temp_dir:
                 subprocess.run(
                     [seven_zip, "x", str(archive), f"-o{temp_dir}", "-y"],
-                    check=True,
+                    check=True, stdout=subprocess.DEVNULL,
                 )
 
-                temp_dir = Path(temp_dir)
+                top_level = list(Path(temp_dir).iterdir())
+                if len(top_level) != 1 or not top_level[0].is_dir():
+                    logger.error("- [Unsupported archive directory structure for stripping, aborting]")
+                    raise SystemExit(1)
+                root = top_level[0]
 
-                extracted_files = []
-
-                for item in temp_dir.iterdir():
-                    if not item.is_dir():
-                        logger.error(
-                            "- [Unsupported archive directory structure for stripping, aborting]"
-                        )
-                        raise SystemExit(1)
-
-                    if strip_components != 1:
-                        logger.error(
-                            "- [Unsupported strip_components value, aborting]"
-                        )
-                        raise SystemExit(1)
-
-                    extracted_files.extend(item.rglob("*"))
-
-                # Check all conflicts before moving anything.
-                conflicts = [
-                    Path(dest) / file.relative_to(temp_dir) 
-                    for file in extracted_files
+                # (source, target) with the top-level folder stripped from the path
+                moves = [
+                    (file, Path(dest) / file.relative_to(root))
+                    for file in root.rglob("*")
                     if file.is_file()
-                    and (Path(dest) / file.relative_to(temp_dir)).exists()
                 ]
 
-                if conflicts:
+                # Check all conflicts before moving anything.
+                conflicts = [target for _, target in moves if target.exists()]
+                if conflicts and not overwrite:
                     print()
                     logger.warning("- [The following files already exist:]")
-
                     for conflict in conflicts:
                         logger.warning(f"- [{conflict}]")
-
                     print()
-                    if not yes_or_no(
-                        "Override existing files? [y/N] >>> ",
-                        default=False,
-                    ):
+                    if not yes_or_no("Override existing files? [y/N] >>> ", default=False):
                         logger.info("- [Extraction cancelled]")
                         return False
 
-                # Move extracted files.
-                for item in extracted_files:
-                    if not item.is_file():
-                        continue
-
-                    relative_path = item.relative_to(temp_dir)
-                    target = Path(dest) / relative_path
-
+                for source, target in moves:
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(item), str(target))        
+                    shutil.move(str(source), str(target))
         else:
             subprocess.run(
                 [seven_zip, "x", str(archive), f"-o{dest}", "-y"],
@@ -149,7 +130,7 @@ def extract_archive(filename, ARCHIVES_DIR, dest, strip_components=0):
 
 
 
-def extract_artifact(artifacts, artifact_id, paths):
+def extract_artifact(artifacts, artifact_id, paths, overwrite=False):
     """Extract one artifact into its dest. Returns True on success."""
     artifact = next(a for a in artifacts if a["id"] == artifact_id)
     first = artifact["parts"][0] if "parts" in artifact else artifact
@@ -162,4 +143,5 @@ def extract_artifact(artifacts, artifact_id, paths):
         paths["archives_dir"],
         dest,
         strip_components=strip_components,
+        overwrite=overwrite,
     )

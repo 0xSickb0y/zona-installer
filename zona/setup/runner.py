@@ -1,12 +1,14 @@
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from zona.setup import path_ops
 from zona.core.log import logger
 from zona.core import utils, config
 
 DLL_OVERRIDES = config.read_toml_configs()["wine"].get("dll_overrides", "")
+WINETRICKS_LIST_TIMEOUT = 120  # seconds; listing takes a few seconds on a working Wine
 
 PROTONTRICKS_COMMANDS = {
     "apt": [
@@ -135,8 +137,12 @@ def get_proton(runners_dir):
     return proton
 
 
-def proton_env(WINE_PREFIX_DIR, STEAM_ROOT):
-    """Environment for running applications through GE-Proton."""
+def proton_env(WINE_PREFIX_DIR, STEAM_ROOT, dll_overrides=False):
+    """Environment for running applications through GE-Proton.
+
+    `dll_overrides` adds [wine].dll_overrides from config.toml. Only use it when launching programs
+    (game, MO2), which is what the overrides are for; prefix creation and winetricks run without them.
+    """
     pfx = Path(WINE_PREFIX_DIR).resolve()
 
     if pfx.name != "pfx":
@@ -147,7 +153,7 @@ def proton_env(WINE_PREFIX_DIR, STEAM_ROOT):
         "STEAM_COMPAT_DATA_PATH": str(pfx.parent),
         "STEAM_COMPAT_CLIENT_INSTALL_PATH": str(Path(STEAM_ROOT).resolve()),
     }
-    if DLL_OVERRIDES:
+    if dll_overrides and DLL_OVERRIDES:
         env["WINEDLLOVERRIDES"] = DLL_OVERRIDES
     return env
 
@@ -211,21 +217,31 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, runners_dir):
         "WINESERVER": str(wine.with_name("wineserver")),
     }
 
-    try:
-        list_result = subprocess.run(
-            ["winetricks", "list-installed"],
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except OSError as error:
-        logger.error(f"- [Could not query winetricks: {error}]")
-        return False
+    # list-installed runs first and takes seconds, so it doubles as a "does Wine start" check:
+    # a broken Proton install hangs here forever otherwise. Output goes to a temp file because Wine
+    # background processes inherit a pipe and keep it open, which would block even after the timeout.
+    with tempfile.TemporaryFile(mode="w+") as log:
+        try:
+            list_result = subprocess.run(
+                ["winetricks", "list-installed"],
+                env=env, stdout=log, stderr=subprocess.DEVNULL, check=False,
+                timeout=WINETRICKS_LIST_TIMEOUT,
+            )
+        except OSError as error:
+            logger.error(f"- [Could not query winetricks: {error}]")
+            return False
+        except subprocess.TimeoutExpired:
+            subprocess.run([env["WINESERVER"], "-k"], env=env, check=False)
+            logger.error(
+                f"- [Wine did not respond within {WINETRICKS_LIST_TIMEOUT}s: "
+                f"the GE-Proton install in '{proton.parent}' may be broken, reinstall it]"
+            )
+            return False
+        log.seek(0)
+        output = log.read()
 
     installed = set()
     if list_result.returncode == 0:
-        output = list_result.stdout or ""
         installed = {line.strip() for line in output.splitlines() if line.strip()}
 
     failed = []
@@ -286,7 +302,7 @@ def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, runners_dir, suppress_output
     try:
         result = subprocess.run(
             [str(proton), "run", str(exe_path)],
-            env=proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(runners_dir).parent),
+            env=proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(runners_dir).parent, dll_overrides=True),
             cwd=str(working_dir),
             **extra,
         )

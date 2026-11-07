@@ -8,6 +8,25 @@ def read_toml_configs():
         return tomllib.load(f)
 
 
+def resolve_alternatives(artifacts, archives_dir):
+    """Point artifacts with `alternatives` at whichever copy is on disk.
+
+    The primary filename/md5 wins if present; otherwise the first alternative found in
+    archives_dir replaces it. Mutates the artifact dicts in place so every later step
+    (verification, extraction) sees the same file. Returns the list for convenience.
+    """
+    for artifact in artifacts:
+        alternatives = artifact.get("alternatives")
+        if not alternatives or (Path(archives_dir) / artifact["filename"]).is_file():
+            continue
+        found = next((alt for alt in alternatives if (Path(archives_dir) / alt["filename"]).is_file()), None)
+        if found is not None:
+            artifact["primary"] = {"filename": artifact["filename"], "md5": artifact["md5"]}
+            artifact["filename"] = found["filename"]
+            artifact["md5"] = found["md5"]
+    return artifacts
+
+
 def get_project_version():
     return read_toml_configs()["project"]["version"] 
 
