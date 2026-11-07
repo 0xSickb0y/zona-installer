@@ -6,24 +6,30 @@ from zona.core import utils
 from zona.core.log import logger
 
 
-STEAM_ROOTS = {
+# Folders that hold Steam's 'userdata', in lookup order: native first, then Flatpak.
+# (A tuple, not a set: with both installs present the choice must be predictable.)
+FLATPAK_STEAM_APP_DIR = "~/.var/app/com.valvesoftware.Steam"
+STEAM_ROOTS = (
     "~/.steam/steam",
     "~/.local/share/Steam",
-    "~/.var/app/com.valvesoftware.Steam",  # Flatpak
-}
+    f"{FLATPAK_STEAM_APP_DIR}/.local/share/Steam",  # Flatpak (current layout)
+    f"{FLATPAK_STEAM_APP_DIR}/data/Steam",          # Flatpak (older layout)
+)
 
 
 STEAM_RUNNER_DIRS = (
     "~/.steam/root/compatibilitytools.d",
     "~/.local/share/Steam/compatibilitytools.d",
-    "~/.var/app/com.valvesoftware.Steam/data/Steam/compatibilitytools.d",  # Flatpak
+    f"{FLATPAK_STEAM_APP_DIR}/.local/share/Steam/compatibilitytools.d",  # Flatpak
+    f"{FLATPAK_STEAM_APP_DIR}/data/Steam/compatibilitytools.d",          # Flatpak (older layout)
 )
 
 PROTECTED_STEAM_ROOTS = {
     Path("~/.steam/root").expanduser().resolve(),
     Path("~/.steam/steam/compatdata").expanduser().resolve(),
     Path("~/.local/share/Steam/compatdata").expanduser().resolve(),
-    Path("~/.var/app/com.valvesoftware.Steam/data/Steam/compatdata").expanduser().resolve(),
+    Path(f"{FLATPAK_STEAM_APP_DIR}/data/Steam/compatdata").expanduser().resolve(),
+    Path(f"{FLATPAK_STEAM_APP_DIR}/.local/share/Steam/compatdata").expanduser().resolve(),
     *{Path(root).expanduser().resolve() for root in (*STEAM_ROOTS, *STEAM_RUNNER_DIRS)},
 }
 
@@ -209,7 +215,7 @@ def steam_installed():
     """True if a native or Flatpak Steam install is found."""
     if shutil.which("steam"):
         return True
-    return any(Path(directory).expanduser().exists() for directory in STEAM_ROOTS)
+    return any(Path(d).expanduser().exists() for d in (*STEAM_ROOTS, FLATPAK_STEAM_APP_DIR))
 
 
 def find_steam_root():
@@ -219,6 +225,11 @@ def find_steam_root():
         if (root / "userdata").is_dir():
             return root.resolve()
     return None
+
+
+def is_flatpak_steam(steam_root):
+    """True if `steam_root` belongs to the Flatpak Steam (which runs sandboxed)."""
+    return Path(steam_root).resolve().is_relative_to(Path(FLATPAK_STEAM_APP_DIR).expanduser().resolve())
 
 
 def link_directory(link, target):

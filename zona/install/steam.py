@@ -3,6 +3,7 @@ import vdf
 import zlib
 import subprocess
 from pathlib import Path
+from zona.core import utils
 from zona.core.log import logger
 from zona.install import ARTIFACTS
 from zona.setup import path_ops, runner
@@ -10,6 +11,7 @@ from zona.setup import path_ops, runner
 
 
 SHORTCUT_NAME = "S.T.A.L.K.E.R.: ZONA"  # title shown in the Steam library
+FLATPAK_APP_ID = "com.valvesoftware.Steam"
 
 
 def steam_running():
@@ -129,6 +131,13 @@ def add_to_library(paths):
         logger.error(f"- [No Steam user found in '{root / 'userdata'}': log in to Steam once first]")
         return False
 
+    # Flatpak Steam is sandboxed: it must be allowed to see the install folder and GE-Proton
+    # (zona links GE-Proton into compatibilitytools.d; the link target must be visible too).
+    if path_ops.is_flatpak_steam(root):
+        logger.info("- [Flatpak Steam detected]")
+        if not ensure_flatpak_access([Path(paths["install_dir"]), proton.parent.resolve()]):
+            return False
+
     # Steam only offers tools that live in its compatibilitytools.d
     tools_dir = root / "compatibilitytools.d"
     if not proton.resolve().is_relative_to(tools_dir.resolve()):
@@ -168,6 +177,68 @@ def add_to_library(paths):
 
     logger.info("- [ZONA prefix successfully connected to Steam]")
     logger.info(f"- [Done. Start Steam: '{SHORTCUT_NAME}' is in your library]")
+    return True
+
+
+def flatpak_filesystems():
+    """The filesystem permissions of Flatpak Steam: its own plus the user's overrides."""
+    tokens = []
+    for command in (
+        ["flatpak", "info", "--show-permissions", FLATPAK_APP_ID],
+        ["flatpak", "override", "--user", "--show", FLATPAK_APP_ID],
+    ):
+        try:
+            output = subprocess.run(command, capture_output=True, text=True, timeout=30).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        for line in output.splitlines():
+            if line.startswith("filesystems="):
+                tokens += [t for t in line.split("=", 1)[1].split(";") if t]
+    return tokens
+
+
+def flatpak_can_write(path, tokens):
+    """True if Flatpak Steam can read and write `path` (its own data dir, 'home', 'host' or a parent folder)."""
+    path = Path(path).resolve()
+    if path.is_relative_to(Path(path_ops.FLATPAK_STEAM_APP_DIR).expanduser().resolve()):
+        return True
+    for token in tokens:
+        name, _, mode = token.partition(":")
+        if name.startswith("!") or mode == "ro":
+            continue
+        if name == "host":
+            return True
+        if name == "home" and path.is_relative_to(Path.home().resolve()):
+            return True
+        if name.startswith(("/", "~")) and path.is_relative_to(Path(name).expanduser().resolve()):
+            return True
+    return False
+
+
+def ensure_flatpak_access(folders):
+    """Make sure Flatpak Steam can use `folders`; offer to grant access if not. Returns True if it can."""
+    tokens = flatpak_filesystems()
+    missing = [folder for folder in folders if not flatpak_can_write(folder, tokens)]
+    if not missing:
+        return True
+
+    logger.warning("- [Flatpak Steam cannot access these folders (it runs sandboxed):]")
+    for folder in missing:
+        print(f"{'':9} - {folder}")
+    commands = [["flatpak", "override", "--user", f"--filesystem={folder}", FLATPAK_APP_ID] for folder in missing]
+    if not utils.yes_or_no("Grant Flatpak Steam access to them? [Y/n] >>> ", default=True):
+        logger.error("- [Without access Steam cannot start ZONA. To grant it later, run:]")
+        for command in commands:
+            print(f"{'':9}   {' '.join(command)}")
+        return False
+
+    for command in commands:
+        try:
+            subprocess.run(command, check=True, capture_output=True, text=True)
+        except (OSError, subprocess.CalledProcessError) as error:
+            logger.error(f"- [Could not run '{' '.join(command)}': {error}]")
+            return False
+        logger.info(f"- [Granted Flatpak Steam access to '{command[3].split('=', 1)[1]}']")
     return True
 
 
