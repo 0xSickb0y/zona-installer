@@ -1,3 +1,6 @@
+import os
+import sys
+import shutil
 from zona import mo2
 from zona import setup
 from zona import install
@@ -8,9 +11,14 @@ from zona.core import config, utils
 from zona.core.log import logger, setup_logging
 
 
+WINE_COMMANDS = {"setup", "install", "mo2"}  # commands that run Proton's Wine
+
+
 def main():
     setup_logging()
     args = config.cli_arguments()
+    if args.command in WINE_COMMANDS:
+        restart_in_fhs()
     version = config.get_project_version()
     paths = path_ops.resolve_paths(
         config.read_toml_configs(),
@@ -131,3 +139,20 @@ def use_steam_prefix(args, paths):
     paths["wine_prefix_dir"] = prefix
     logger.info(f"- [Steam prefix: {prefix}]")
     return True
+
+
+def restart_in_fhs():
+    """On NixOS, re-run this same zona command inside steam-run (an FHS environment), which
+    Proton's Wine needs. Does nothing elsewhere, or when already inside one."""
+    if not path_ops.needs_fhs() or os.environ.get("ZONA_IN_FHS"):
+        return
+    steam_run = shutil.which("steam-run")
+    if steam_run is None:
+        logger.warning(
+            "- [NixOS detected: Wine needs an FHS environment but 'steam-run' was not found. "
+            "Enable programs.steam (or add steam-run) and run 'steam-run zona ...']"
+        )
+        return
+    logger.info("- [NixOS detected: restarting inside steam-run (FHS environment)]")
+    os.environ["ZONA_IN_FHS"] = "1"  # don't restart again inside steam-run
+    os.execvp(steam_run, [steam_run, *sys.orig_argv])

@@ -144,9 +144,9 @@ def run(paths, skip_archive_cleanup=False):
             )
             raise SystemExit(1)
 
-        # 7. Ensure GE-Proton
+        # 7. Pick the Proton to use (-r, menu, or download GE-Proton)
         if proton.ensure_proton(ARTIFACTS, paths) is None:
-            logger.error("- [Could not get GE-Proton, aborting]")
+            logger.error("- [Could not get a Proton runner, aborting]")
             raise SystemExit(1)
 
         # 8. Setup protontricks

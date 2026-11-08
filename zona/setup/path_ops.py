@@ -1,8 +1,8 @@
 import os
 import re
+import vdf
 import shutil
 import tarfile
-import vdf
 from pathlib import Path
 from zona.core import utils
 from zona.core.log import logger
@@ -218,6 +218,12 @@ def steam_installed():
     if shutil.which("steam"):
         return True
     return any(Path(d).expanduser().exists() for d in (*STEAM_ROOTS, FLATPAK_STEAM_APP_DIR))
+
+
+def needs_fhs():
+    """True on NixOS outside an FHS environment: Proton's Wine expects standard paths such as
+    /lib/ld-linux.so.2, which only exist inside one (steam-run, or Steam itself)."""
+    return Path("/etc/NIXOS").exists() and not Path("/lib/ld-linux.so.2").exists()
 
 
 def find_steam_root():

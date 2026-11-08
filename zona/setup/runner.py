@@ -165,7 +165,7 @@ def choose_runner(runners):
 
 
 def proton_env(WINE_PREFIX_DIR, STEAM_ROOT, dll_overrides=False):
-    """Environment for running applications through GE-Proton.
+    """Environment for running applications through Proton.
 
     `dll_overrides` adds [wine].dll_overrides from config.toml. Only use it when launching programs
     (game, MO2), which is what the overrides are for; prefix creation and winetricks run without them.
@@ -199,7 +199,7 @@ def setup_protontricks():
 
 
 def create_prefix(WINE_PREFIX_DIR, paths):
-    """Create the prefix by letting GE-Proton set it up. Returns True on success."""
+    """Create the prefix by letting Proton set it up. Returns True on success."""
     if (WINE_PREFIX_DIR / "drive_c").exists():
         logger.info(f"- [Wine prefix already exists: '{WINE_PREFIX_DIR}']")
         return True
@@ -208,7 +208,7 @@ def create_prefix(WINE_PREFIX_DIR, paths):
     if proton is None:
         return False
 
-    logger.info(f"- [Creating the prefix with GE-Proton in '{WINE_PREFIX_DIR}']")
+    logger.info(f"- [Creating the prefix with {proton.parent.name} in '{WINE_PREFIX_DIR}']")
     try:
         result = subprocess.run(
             [str(proton), "run", "wineboot", "-u"],
@@ -216,11 +216,11 @@ def create_prefix(WINE_PREFIX_DIR, paths):
             capture_output=True, text=True,
         )
     except OSError as error:
-        logger.error(f"- [Could not run GE-Proton: {error}]")
+        logger.error(f"- [Could not run {proton.parent.name}: {error}]")
         return False
 
     if not (WINE_PREFIX_DIR / "drive_c").exists():
-        logger.error(f"- [GE-Proton did not create the prefix (exit {result.returncode})]")
+        logger.error(f"- [{proton.parent.name} did not create the prefix (exit {result.returncode})]")
         print(result.stderr[-1500:])
         return False
     return True
@@ -261,7 +261,7 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, paths):
             subprocess.run([env["WINESERVER"], "-k"], env=env, check=False)
             logger.error(
                 f"- [Wine did not respond within {WINETRICKS_LIST_TIMEOUT}s: "
-                f"the GE-Proton install in '{proton.parent}' may be broken, reinstall it]"
+                f"the Proton install in '{proton.parent}' may be broken, reinstall it or pick another with -r]"
             )
             return False
         log.seek(0)
@@ -312,7 +312,7 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, paths):
 
 
 def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, paths, suppress_output=False):
-    """Run a Windows executable through GE-Proton with the app folder as cwd.
+    """Run a Windows executable through Proton with the app folder as cwd.
 
     `suppress_output` quiets Proton stdout/stderr when the caller doesn't want the runtime
     noise; `--verbose` can be added later without changing the function signature.
@@ -324,7 +324,7 @@ def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, paths, suppress_output=False
     exe_path = Path(exe_path)
     working_dir = Path(working_dir)
 
-    logger.info(f"- [Launching via GE-Proton: {exe_path.name}]")
+    logger.info(f"- [Launching via {proton.parent.name}: {exe_path.name}]")
     extra = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL} if suppress_output else {}
     try:
         result = subprocess.run(
@@ -334,7 +334,7 @@ def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, paths, suppress_output=False
             **extra,
         )
     except OSError as error:
-        logger.error(f"- [Could not run GE-Proton: {error}]")
+        logger.error(f"- [Could not run {proton.parent.name}: {error}]")
         return False
 
     logger.info(f"- [{exe_path.name} exited with code {result.returncode}]")
