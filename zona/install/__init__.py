@@ -45,7 +45,7 @@ def run(paths, modpack_source):
                 default=True,
             ):
                 logger.info("- [Skipped Anomaly launch; MO2 may need the first-run files generated later]")    
-            elif not runner.run_exe(dest / GAME_EXE, dest, paths["wine_prefix_dir"], paths["runners_dir"], suppress_output=True): # TODO: --verbose option removes suppress_output=True
+            elif not runner.run_exe(dest / GAME_EXE, dest, paths["wine_prefix_dir"], paths, suppress_output=True): # TODO: --verbose option removes suppress_output=True
                 logger.error("- [Could not launch the game, aborting]")
                 raise SystemExit(1)
 

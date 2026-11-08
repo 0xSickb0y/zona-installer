@@ -27,7 +27,7 @@ def run(paths):
             logger.info(f"- [ZONA modpack not installed in '{MO2_DIR}', aborting]")
             raise SystemExit(1)
 
-        if not runner.run_exe(MO2_PATH, str(MO2_DIR), WINE_PREFIX_DIR, paths["runners_dir"], suppress_output=True): # TODO: --verbose option removes suppress_output=True
+        if not runner.run_exe(MO2_PATH, str(MO2_DIR), WINE_PREFIX_DIR, paths, suppress_output=True): # TODO: --verbose option removes suppress_output=True
             logger.error("- [Could not launch ModOrganizer2, aborting]")
             raise SystemExit(1)
 

@@ -1,6 +1,8 @@
 import os
+import re
 import shutil
 import tarfile
+import vdf
 from pathlib import Path
 from zona.core import utils
 from zona.core.log import logger
@@ -258,6 +260,57 @@ def runner_dirs(runners_dir):
     return STEAM_ROOTS + [Path(runners_dir)]
 
 
+def steam_libraries():
+    """Every Steam library folder (the main install included), from libraryfolders.vdf."""
+    root = find_steam_root()
+    if root is None:
+        return []
+    libraries = [root]
+    try:
+        text = (root / "steamapps" / "libraryfolders.vdf").read_text(encoding="utf-8")
+        folders = vdf.loads(text).get("libraryfolders", {})
+    except (OSError, SyntaxError):
+        return libraries
+    for folder in folders.values():
+        if isinstance(folder, dict) and "path" in folder:
+            library = Path(folder["path"])
+            if library.resolve() not in {lib.resolve() for lib in libraries}:
+                libraries.append(library)
+    return libraries
+
+
+def find_steam_protons():
+    """'proton' scripts of the Protons Steam installed itself, in every library
+    (steamapps/common/Proton 11.0, Proton - Experimental, Proton Hotfix, ...)."""
+    return sorted(
+        proton
+        for library in steam_libraries()
+        for proton in (library / "steamapps" / "common").glob("Proton*/proton")
+        if proton.is_file()
+    )
+
+
+def find_runners(runners_dir):
+    """Every usable Proton, best first: GE-Proton (newest first), other custom tools,
+    then the Protons Steam installed itself. Each entry is the path of its 'proton' script."""
+    def version(proton):  # 'GE-Proton11-12-x86_64' -> (11, 12, 86, 64): newer sorts higher
+        return tuple(int(n) for n in re.findall(r"\d+", proton.parent.name))
+
+    seen, custom = set(), []
+    for base in runner_dirs(runners_dir):
+        for proton in base.glob("*/proton"):
+            if proton.is_file() and not proton.parent.name.endswith(".bak") and proton.resolve() not in seen:
+                seen.add(proton.resolve())
+                custom.append(proton)
+    ge = sorted((p for p in custom if p.parent.name.startswith("GE-Proton")), key=version, reverse=True)
+    others = sorted(p for p in custom if not p.parent.name.startswith("GE-Proton"))
+    steam = sorted(
+        (p for p in find_steam_protons() if p.resolve() not in seen),
+        key=lambda p: (p.parent.name != "Proton - Experimental", tuple(-n for n in version(p))),
+    )
+    return ge + others + steam
+
+
 def find_ge_proton(runners_dir, name=None):
     """Path of a GE-Proton 'proton' script, or None. With `name` (e.g. 'GE-Proton10-9')
     only that version matches, otherwise the newest one wins."""
@@ -355,7 +408,7 @@ def is_valid_steam_proton_prefix(path):
     return "compatdata" in candidate.parts and candidate.parent.name.isdigit()
 
 
-def resolve_paths(toml_config, install_dir=None, archives_dir=None, runners_dir=None, proton_prefix=None):
+def resolve_paths(toml_config, install_dir=None, archives_dir=None, runners_dir=None, proton_prefix=None, runner=None):
     """Directories from config.toml, with CLI values taking priority.
 
     If the default config omits the runner/prefix, we resolve a Steam-compatible default at runtime.
@@ -400,6 +453,10 @@ def resolve_paths(toml_config, install_dir=None, archives_dir=None, runners_dir=
 
     if not paths["runners_dir"].is_absolute():
         paths["runners_dir"] = paths["runners_dir"].resolve()
+
+    # -r: one specific Proton folder to use instead of GE-Proton (None = automatic)
+    runner_path = expand_var_and_user(runner)
+    paths["runner"] = runner_path.resolve() if runner_path is not None else None
 
     return paths
 

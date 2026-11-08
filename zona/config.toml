@@ -1,5 +1,5 @@
 [project]
-name = "ZONA"
+name = "S.T.A.L.K.E.R. ZONA"
 version = "1.38"
 
 
@@ -10,7 +10,7 @@ archives_dir = "$HOME/Games/.zona_archives"
 
 [wine]
 components = [
-  "cmd", "d3dcompiler_43", "d3dcompiler_47", "d3dx10", "d3dx11_43",
+  "d3dcompiler_43", "d3dcompiler_47", "d3dx10", "d3dx11_43",
   "d3dx9", "d3dx9_43", "mfc42", "ogg", "openal", "quartz", "vcrun2022",
 ]
 dll_overrides = "wineopenxr=d" # Wine DLL overrides for every Proton run (wineopenxr crashes GE-Proton11-12)

@@ -45,7 +45,8 @@ zona --help
 | `-b`, `--no-banner`        | all (before the command)              | Hide the startup banner                             |
 | `-i`, `--install-dir DIR`  | setup, install, delete, mo2, steam    | Where ZONA is installed (default `~/Games/ZONA`)    |
 | `-a`, `--archives-dir DIR` | download, setup, install, delete      | Where archives are stored (default `~/Games/.zona_archives`) |
-| `-r`, `--runners-dir DIR`  | setup, install, delete, mo2, steam    | Where GE-Proton is looked up / stored (default: Steam's `compatibilitytools.d`) |
+| `-s`, `--steam-runners DIR`| setup, install, delete, mo2, steam    | Where GE-Proton is looked up / stored (default: Steam's `compatibilitytools.d`) |
+| `-r`, `--runner DIR`       | setup, install, delete, mo2, steam    | Use this Proton instead of GE-Proton, e.g. `~/.steam/steam/steamapps/common/Proton - Experimental` |
 | `-p`, `--proton-prefix DIR`| setup, install, delete, mo2, steam    | Proton prefix to use (default: `<steam>/compatdata/999999/pfx`) |
 | `--steam`                  | install                               | Also add MO2 to the Steam library                   |
 

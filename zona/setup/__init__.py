@@ -165,13 +165,13 @@ def run(paths, skip_archive_cleanup=False):
             raise SystemExit(1)
 
         # 11. Create Wine/Proton prefix
-        if not runner.create_prefix(WINE_PREFIX_DIR, RUNNERS_DIR):
+        if not runner.create_prefix(WINE_PREFIX_DIR, paths):
             logger.error("- [Could not set up wine prefix, aborting]")
             raise SystemExit(1)
 
         # 12. Install prefix components
         if not runner.install_components(
-            WINE_PREFIX_DIR, WINE_COMPONENTS, RUNNERS_DIR
+            WINE_PREFIX_DIR, WINE_COMPONENTS, paths
         ):
             logger.error("- [Could not install prefix components, aborting]")
             raise SystemExit(1)

@@ -129,12 +129,39 @@ def install_packages(commands_by_manager, package_label="packages"):
     return True
 
 
-def get_proton(runners_dir):
-    """Path of the GE-Proton 'proton' script, or None (with an error logged)."""
-    proton = path_ops.find_ge_proton(runners_dir)
-    if proton is None:
-        logger.error("- [GE-Proton not found, run 'zona setup' first]")
+def get_proton(paths):
+    """The 'proton' script to use, or None (with an error logged).
+
+    -r wins. Otherwise every installed Proton is considered: one is used directly, several are
+    offered in a menu (newest GE-Proton first, the default). The choice is stored in
+    paths["runner"], so every later step uses the same Proton without asking again.
+    """
+    if paths.get("runner"):
+        proton = Path(paths["runner"]) / "proton"
+        if not proton.is_file():
+            logger.error(f"- [No 'proton' script in '{paths['runner']}': -r must point at a Proton folder]")
+            return None
+        return proton
+
+    runners = path_ops.find_runners(paths["runners_dir"])
+    if not runners:
+        logger.error("- [No Proton found: run 'zona setup' first, or pick one with -r]")
+        return None
+
+    proton = runners[0] if len(runners) == 1 else runners[choose_runner(runners)]
+    paths["runner"] = proton.parent
+    logger.info(f"- [Using runner '{proton.parent.name}']")
     return proton
+
+
+def choose_runner(runners):
+    """Ask which Proton to use. Returns its index in `runners`."""
+    steam_protons = set(path_ops.find_steam_protons())
+    labels = [
+        f"{proton.parent.name}  (installed by Steam)" if proton in steam_protons else proton.parent.name
+        for proton in runners
+    ]
+    return utils.choose("runners", labels, default=0)
 
 
 def proton_env(WINE_PREFIX_DIR, STEAM_ROOT, dll_overrides=False):
@@ -171,13 +198,13 @@ def setup_protontricks():
     return install_packages(PROTONTRICKS_COMMANDS, "protontricks")
 
 
-def create_prefix(WINE_PREFIX_DIR, runners_dir):
+def create_prefix(WINE_PREFIX_DIR, paths):
     """Create the prefix by letting GE-Proton set it up. Returns True on success."""
     if (WINE_PREFIX_DIR / "drive_c").exists():
         logger.info(f"- [Wine prefix already exists: '{WINE_PREFIX_DIR}']")
         return True
 
-    proton = get_proton(runners_dir)
+    proton = get_proton(paths)
     if proton is None:
         return False
 
@@ -185,7 +212,7 @@ def create_prefix(WINE_PREFIX_DIR, runners_dir):
     try:
         result = subprocess.run(
             [str(proton), "run", "wineboot", "-u"],
-            env=proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(runners_dir).parent),
+            env=proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(paths["runners_dir"]).parent),
             capture_output=True, text=True,
         )
     except OSError as error:
@@ -199,9 +226,9 @@ def create_prefix(WINE_PREFIX_DIR, runners_dir):
     return True
 
 
-def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, runners_dir):
+def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, paths):
     """Install Windows components into the Proton prefix without requiring a Steam AppID."""
-    proton = get_proton(runners_dir)
+    proton = get_proton(paths)
     if proton is None:
         return False
 
@@ -211,7 +238,7 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, runners_dir):
         return False
 
     env = {
-        **proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(runners_dir).parent),
+        **proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(paths["runners_dir"]).parent),
         "WINEPREFIX": str(WINE_PREFIX_DIR),
         "WINE": str(wine),
         "WINESERVER": str(wine.with_name("wineserver")),
@@ -284,13 +311,13 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, runners_dir):
     return not failed
 
 
-def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, runners_dir, suppress_output=False):
+def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, paths, suppress_output=False):
     """Run a Windows executable through GE-Proton with the app folder as cwd.
 
     `suppress_output` quiets Proton stdout/stderr when the caller doesn't want the runtime
     noise; `--verbose` can be added later without changing the function signature.
     """
-    proton = get_proton(runners_dir)
+    proton = get_proton(paths)
     if proton is None:
         return False
 
@@ -302,7 +329,7 @@ def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, runners_dir, suppress_output
     try:
         result = subprocess.run(
             [str(proton), "run", str(exe_path)],
-            env=proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(runners_dir).parent, dll_overrides=True),
+            env=proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(paths["runners_dir"]).parent, dll_overrides=True),
             cwd=str(working_dir),
             **extra,
         )

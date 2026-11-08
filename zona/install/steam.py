@@ -3,9 +3,9 @@ import vdf
 import zlib
 import subprocess
 from pathlib import Path
-from zona.core import utils
 from zona.core.log import logger
 from zona.install import ARTIFACTS
+from zona.core import config, utils
 from zona.setup import path_ops, runner
 
 
@@ -100,11 +100,11 @@ def add_to_library(paths):
         logger.error("- [Steam install not found]")
         return False
 
-    proton = path_ops.find_ge_proton(paths["runners_dir"])
+    proton = runner.get_proton(paths)
     if proton is None:
-        logger.error("- [GE-Proton not found, run 'zona setup' first]")
         return False
-    tool = proton.parent.name
+    tool = compat_tool_name(proton.parent)
+    steam_proton = proton in path_ops.find_steam_protons()  # installed by Steam itself
 
     prefix_path = Path(paths["wine_prefix_dir"]).resolve()
     # Accept either the pfx directory itself or its parent.
@@ -135,13 +135,15 @@ def add_to_library(paths):
     # (zona links GE-Proton into compatibilitytools.d; the link target must be visible too).
     if path_ops.is_flatpak_steam(root):
         logger.info("- [Flatpak Steam detected]")
-        if not ensure_flatpak_access([Path(paths["install_dir"]), proton.parent.resolve()]):
+        folders = [Path(paths["install_dir"])] + ([] if steam_proton else [proton.parent.resolve()])
+        if not ensure_flatpak_access(folders):
             return False
 
     # Steam only offers tools that live in its compatibilitytools.d
+    # (Steam's own Protons in steamapps/common are always offered, they need no link.)
     tools_dir = root / "compatibilitytools.d"
-    if not proton.resolve().is_relative_to(tools_dir.resolve()):
-        if not path_ops.link_directory(tools_dir / tool, proton.parent):
+    if not steam_proton and not proton.resolve().is_relative_to(tools_dir.resolve()):
+        if not path_ops.link_directory(tools_dir / proton.parent.name, proton.parent):
             return False
 
     # the shortcut itself, for every Steam account
@@ -245,26 +247,51 @@ def ensure_flatpak_access(folders):
 def find_library(path):
     """The Steam library folder that contains `path`, or None.
     Valid means: listed in Steam's libraryfolders.vdf and has a 'steamapps' folder."""
+    if path_ops.find_steam_root() is None:
+        logger.error("- [Steam install not found]")
+        return None
+    path = Path(path).resolve()
+    for library in path_ops.steam_libraries():
+        if path.is_relative_to(library.resolve()) and (library / "steamapps").is_dir():
+            return library
+    return None
+
+
+def compat_tool_name(tool_dir):
+    """The name Steam uses for a compatibility tool in config.vdf's CompatToolMapping.
+
+    Custom tools (GE-Proton) declare it in compatibilitytool.vdf. Steam's own Protons don't
+    ship one; their names follow the folder: 'Proton - Experimental' -> proton_experimental,
+    'Proton Hotfix' -> proton_hotfix, 'Proton 11.0' -> proton_11.
+    """
+    tool_dir = Path(tool_dir)
+    manifest = tool_dir / "compatibilitytool.vdf"
+    if manifest.is_file():
+        try:
+            tools = vdf.loads(manifest.read_text(encoding="utf-8"))["compatibilitytools"]["compat_tools"]
+            return next(iter(tools))
+        except (OSError, SyntaxError, KeyError, StopIteration):
+            pass
+
+    name = tool_dir.name
+    if name == "Proton - Experimental":
+        return "proton_experimental"
+    if name == "Proton Hotfix":
+        return "proton_hotfix"
+    version = re.fullmatch(r"Proton (\d+)\.\d+.*", name)
+    if version:
+        return f"proton_{version.group(1)}"
+    return name
+
+
+def default_install_dir():
+    """Where ZONA goes when Steam integration is on and no -i was given:
+    <Steam root>/steamapps/common/<project name>. None if Steam is not found."""
     root = path_ops.find_steam_root()
     if root is None:
         logger.error("- [Steam install not found]")
         return None
-
-    vdf_file = root / "steamapps" / "libraryfolders.vdf"
-    try:
-        folders = vdf.loads(vdf_file.read_text(encoding="utf-8"))["libraryfolders"]
-    except (OSError, SyntaxError, KeyError) as error:
-        logger.error(f"- [Could not read '{vdf_file}': {error}]")
-        return None
-
-    path = Path(path).resolve()
-    for folder in folders.values():
-        if not isinstance(folder, dict) or "path" not in folder:
-            continue
-        library = Path(folder["path"]).resolve()
-        if path.is_relative_to(library) and (library / "steamapps").is_dir():
-            return library
-    return None
+    return root / "steamapps" / "common" / config.read_toml_configs()["project"]["name"]
 
 
 def shortcut_prefix(paths):

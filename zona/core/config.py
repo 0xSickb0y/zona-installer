@@ -53,9 +53,16 @@ def cli_arguments():
         help="Where downloaded archives are stored (default: archives_dir from config.toml)",
     )
     common.add_argument(
-        "-r", "--runners-dir",
+        "-s", "--steam-runners",
+        dest="runners_dir",
         metavar="DIR",
-        help="Where GE-Proton is discovered/stored (independent from install_dir and prefix)",
+        help="Where GE-Proton is discovered/stored (default: Steam's compatibilitytools.d)",
+    )
+    common.add_argument(
+        "-r", "--runner",
+        metavar="DIR",
+        help="Use this Proton instead of GE-Proton, e.g. "
+             "'~/.steam/steam/steamapps/common/Proton - Experimental' (the folder holding the 'proton' script)",
     )
     common.add_argument(
         "-p", "--proton-prefix",
@@ -112,9 +119,16 @@ def cli_arguments():
         help="Where to install ZONA (default: install_dir from config.toml)",
     )
     mo2_parser.add_argument(
-        "-r", "--runners-dir",
+        "-s", "--steam-runners",
+        dest="runners_dir",
         metavar="DIR",
-        help="Where GE-Proton is discovered/stored (independent from install_dir and prefix)",
+        help="Where GE-Proton is discovered/stored (default: Steam's compatibilitytools.d)",
+    )
+    mo2_parser.add_argument(
+        "-r", "--runner",
+        metavar="DIR",
+        help="Use this Proton instead of GE-Proton, e.g. "
+             "'~/.steam/steam/steamapps/common/Proton - Experimental' (the folder holding the 'proton' script)",
     )
     mo2_parser.add_argument(
         "-p", "--proton-prefix",

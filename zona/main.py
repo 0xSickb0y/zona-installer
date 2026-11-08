@@ -1,7 +1,7 @@
-from zona import download
 from zona import mo2
 from zona import setup
 from zona import install
+from zona import download
 from zona.install import steam
 from zona.setup import path_ops
 from zona.core import config, utils
@@ -18,6 +18,7 @@ def main():
         getattr(args, "archives_dir", None),
         getattr(args, "runners_dir", None),
         getattr(args, "proton_prefix", None),
+        getattr(args, "runner", None),
     )
 
     print(f"S.T.A.L.K.E.R.: Anomaly - ZONA modpack v{version} installer for Linux.")
@@ -60,13 +61,15 @@ def main():
         if args.steam and steam.steam_running():
             logger.error("- [Steam is running: close it first, it would overwrite the library changes]")
             raise SystemExit(1)
+        if not use_steam_install_dir(args, paths):
+            raise SystemExit(1)
         if args.steam and not use_steam_prefix(args, paths):
             logger.error("- [Could not set up the Steam prefix, aborting]")
             raise SystemExit(1)
         logger.info("- [Initializing ZONA modpack installation]\n")
         modpack_source = setup.run(paths)
         install.run(paths, modpack_source)
-        if not use_steam_prefix(args, paths):
+        if args.steam and not use_steam_prefix(args, paths):
             logger.error("- [Could not set up the Steam prefix, aborting]")
             raise SystemExit(1)
         if args.steam and not steam.add_to_library(paths):
@@ -80,6 +83,8 @@ def main():
 
     if args.command == "steam":
         logger.info("- [Adding Mod Organizer 2 to the Steam library]\n")
+        if not use_steam_install_dir(args, paths):
+            raise SystemExit(1)
         if not steam.add_to_library(paths):
             logger.error("- [Failed to add Mod Organizer 2 to the Steam library]")
             raise SystemExit(1)
@@ -88,6 +93,24 @@ def main():
         # logger.info("- [Initializing ZONA modpack removal]\n")
         # delete.run(paths)
         pass
+
+
+def steam_mode(args):
+    """True when Steam integration is on: `zona install --steam` (or answered yes) or `zona steam`."""
+    return args.command == "steam" or bool(getattr(args, "steam", False))
+
+
+def use_steam_install_dir(args, paths):
+    """In Steam mode, install into <Steam root>/steamapps/common/ZONA instead of config.toml's
+    install_dir. An explicit -i always wins. Returns False if Steam can't be found."""
+    if not steam_mode(args) or getattr(args, "install_dir", None):
+        return True
+    install_dir = steam.default_install_dir()
+    if install_dir is None:
+        return False
+    paths["install_dir"] = install_dir
+    logger.info(f"- [Steam mode: installing to '{install_dir}' (pass -i to choose another folder)]")
+    return True
 
 
 def use_steam_prefix(args, paths):
