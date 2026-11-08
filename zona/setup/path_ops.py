@@ -220,10 +220,15 @@ def steam_installed():
     return any(Path(d).expanduser().exists() for d in (*STEAM_ROOTS, FLATPAK_STEAM_APP_DIR))
 
 
+def is_nixos():
+    """True on NixOS (it creates /etc/NIXOS)."""
+    return Path("/etc/NIXOS").exists()
+
+
 def needs_fhs():
     """True on NixOS outside an FHS environment: Proton's Wine expects standard paths such as
     /lib/ld-linux.so.2, which only exist inside one (steam-run, or Steam itself)."""
-    return Path("/etc/NIXOS").exists() and not Path("/lib/ld-linux.so.2").exists()
+    return is_nixos() and not Path("/lib/ld-linux.so.2").exists()
 
 
 def find_steam_root():

@@ -68,6 +68,17 @@ def detect_package_manager():
     return None
 
 
+def show_nix_instructions(package_label):
+    """NixOS: tools are declared in configuration.nix, not installed with sudo. Print how."""
+    package = NIX_PACKAGES.get(package_label, package_label)
+    logger.error(f"- [NixOS detected: zona does not install packages on NixOS, add {package} yourself]")
+    print(f"{'':9}   For this terminal only, then run zona again inside it:")
+    print(f"{'':9}       nix-shell -p {package}")
+    print(f"{'':9}   Permanently: add it to environment.systemPackages in /etc/nixos/configuration.nix:")
+    print(f"{'':9}       environment.systemPackages = with pkgs; [ {package} ];")
+    print(f"{'':9}   then run: sudo nixos-rebuild switch")
+
+
 def setup_7z():
     """Make sure 7z is available, offering to install it. Returns True if it is."""
     if path_ops.find_7z():
@@ -75,6 +86,8 @@ def setup_7z():
         return True
 
     logger.warning("- [7z is not found]")
+    if path_ops.is_nixos():  # nothing to ask: zona prints the Nix commands instead
+        return install_packages(SEVENZIP_COMMANDS, "7zip")
     if not utils.yes_or_no("Install 7zip now? [Y/n] >>> ", default=True):
         logger.error("- [7z is required to extract the archives]")
         return False
@@ -88,6 +101,8 @@ def setup_aria2c():
         return True
 
     logger.warning("- [aria2c is not found]")
+    if path_ops.is_nixos():  # nothing to ask: zona prints the Nix commands instead
+        return install_packages(ARIA2_COMMANDS, "aria2c")
     if not utils.yes_or_no("Install aria2 now? [Y/n] >>> ", default=True):
         logger.error("- [aria2c is required for magnet and torrent downloads]")
         return False
@@ -101,14 +116,25 @@ def setup_winetricks():
         return True
 
     logger.warning("- [winetricks is not found]")
+    if path_ops.is_nixos():  # nothing to ask: zona prints the Nix commands instead
+        return install_packages(WINETRICKS_COMMANDS, "winetricks")
     if not utils.yes_or_no("Install winetricks now? [Y/n] >>> ", default=True):
         logger.error("- [winetricks is required to install the prefix components]")
         return False
     return install_packages(WINETRICKS_COMMANDS, "winetricks")
 
 
+# nixpkgs attribute that provides each tool zona can install
+NIX_PACKAGES = {"protontricks": "protontricks", "winetricks": "winetricks", "7zip": "p7zip", "aria2c": "aria2"}
+
+
 def install_packages(commands_by_manager, package_label="packages"):
-    """Run the install commands for the detected package manager. Returns True on success."""
+    """Run the install commands for the detected package manager. Returns True on success.
+    On NixOS nothing is installed: the Nix commands to do it are printed instead."""
+    if path_ops.is_nixos():
+        show_nix_instructions(package_label)
+        return False
+
     manager = detect_package_manager()
     if manager is None:
         logger.error(f"- [No supported package manager found: install {package_label} manually]")
@@ -192,6 +218,8 @@ def setup_protontricks():
         return True
 
     logger.warning("- [protontricks is not found]")
+    if path_ops.is_nixos():  # nothing to ask: zona prints the Nix commands instead
+        return install_packages(PROTONTRICKS_COMMANDS, "protontricks")
     if not utils.yes_or_no("Install protontricks now? [Y/n] >>> ", default=True):
         logger.error("- [protontricks is required to install the prefix components]")
         return False
