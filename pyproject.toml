@@ -6,10 +6,16 @@ build-backend = "setuptools.build_meta"
 name = "zona"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["requests"]
+dependencies = ["requests", "vdf"]
 
 [project.scripts]
 zona = "zona.main:main"
 
+[tool.setuptools.packages.find]
+include = ["zona*"]
+
 [tool.setuptools.package-data]
-zona = ["config.toml"]
+zona = [
+    "config.toml",
+    "templates/*.ini"
+]

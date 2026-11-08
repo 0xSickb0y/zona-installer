@@ -1,11 +1,19 @@
 [project]
-name = "ZONA"
+name = "S.T.A.L.K.E.R. ZONA"
 version = "1.38"
 
 
 [defaults]
 install_dir = "$HOME/Games/ZONA"
 archives_dir = "$HOME/Games/.zona_archives"
+
+
+[wine]
+components = [
+  "d3dcompiler_43", "d3dcompiler_47", "d3dx10", "d3dx11_43",
+  "d3dx9", "d3dx9_43", "mfc42", "ogg", "openal", "quartz", "vcrun2022",
+]
+dll_overrides = "wineopenxr=d" # Wine DLL overrides for every Proton run (wineopenxr crashes GE-Proton11-12)
 
 
 # Chosen by the user at install time (flags or prompt)
@@ -17,20 +25,27 @@ exes = { default = "regular",    options = ["regular", "mt"] }
 
 [[artifacts]]
 id = "anomaly"
-filename = "Anomaly-1.5.3-Full.2.7z"
-url = "https://www.moddb.com/downloads/start/277404" # TODO: Add logic to resolve moddb 302 redirect to download anomaly (wget maybe ?)
+# Primary = what the torrent produces; aria2c can't rename torrent content, so this must match the torrent.
+filename = "Anomaly-1.5.3-Full.7z"
+url = "magnet:?xt=urn:btih:205676f90498f2be3900a3eb0d29b9f50a591fa1&dn=Anomaly-1.5.3-Full.7z&tr=udp://bt2.archive.org:6969/announce&tr=udp://tracker.opentrackr.org:1337/announce&tr=udp://bt1.archive.org:6969/announce&tr=udp://tracker.torrent.eu.org:451/announce"
 md5 = "d6bce51a4e6d98f9610ef0aa967ba964"
-dest = "{install_dir}/{drive_c}/anomaly"
+# Same release under another name (identical md5); used instead of the primary if found in archives_dir
+alternatives = [
+  { filename = "Anomaly-1.5.3-Full.2.7z", md5 = "d6bce51a4e6d98f9610ef0aa967ba964" },  # ModDB
+]
+check_file = "AnomalyLauncher.exe"
+check_md5 = "5410f91807493fafa6c2dda136a324e7"
+dest = "{install_dir}/anomaly"
 
 
 [[artifacts]]
 id = "exes_regular"
 group = "exes"
 variant = "regular"
-filename = "STALKER-Anomaly-modded-exes_2026.8.17.zip"
-url = "https://github.com/themrdemonized/xray-monolith/releases/download/2026.8.17/STALKER-Anomaly-modded-exes_2026.8.17.zip"
-md5 = "c570e313fcee1d4bcb3fbfbafc80f172"
-dest = "{install_dir}/{drive_c}/anomaly"
+filename = "STALKER-Anomaly-modded-exes_2026.9.12.zip"
+url = "https://github.com/themrdemonized/xray-monolith/releases/download/2026.9.12/STALKER-Anomaly-modded-exes_2026.9.12.zip"
+md5 = "1842062190a34f16e3753bd891978ef4"
+dest = "{install_dir}/anomaly"
 
 
 [[artifacts]]
@@ -38,9 +53,14 @@ id = "exes_mt"
 group = "exes"
 variant = "mt"
 filename = "STALKER-Anomaly-modded-exes-MT-TEST_2026.8.17.zip"
-url = "https://github.com/themrdemonized/xray-monolith/releases/download/2026.8.17/STALKER-Anomaly-modded-exes-MT-TEST_2026.8.17.zip"
-md5 = "ca7588512843b67e49a5c7a42b877ea4"
-dest = "{install_dir}/{drive_c}/anomaly"
+url = "https://github.com/themrdemonized/xray-monolith/releases/download/2026.9.12/STALKER-Anomaly-modded-exes-MT-TEST_2026.9.12.zip"
+md5 = "8ecba8a163251f7b4757591908320155"
+dest = "{install_dir}/anomaly"
+
+
+[[artifacts]]
+id = "ge_proton"
+url = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest"
 
 
 [[artifacts]]
@@ -48,7 +68,7 @@ id = "mo2"
 filename = "Mod.Organizer-2.5.2.7z"
 url = "https://github.com/ModOrganizer2/modorganizer/releases/download/v2.5.2/Mod.Organizer-2.5.2.7z"
 md5 = "b223ce1297107adbabb3fbaa3769eb2b"
-dest = "{install_dir}/{drive_c}/mo2"
+dest = "{install_dir}/mo2"
 
 
 [[artifacts]]
@@ -56,13 +76,23 @@ id = "profiles"
 filename = "zona_profiles.7z"
 url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_profiles.7z"
 md5 = "ee41f34e6f8abe5f85259477cd10f164"
-dest = "{install_dir}/{drive_c}/mo2/profiles"
+dest = "{install_dir}/mo2/profiles"
+
+
+# Either the single archive or the multipart set is enough (see one_of)
+[[artifacts]]
+id = "zona_modpack_single"
+one_of = "modpack"
+filename = "Zona v1.38.7z"
+md5 = "5c10c4b68394de3297df36c3006db49f"
+dest = "{install_dir}/mo2"
 
 
 # Multipart: download all parts, extract only the first
 [[artifacts]]
 id = "zona_modpack"
-dest = "{install_dir}/{drive_c}/mo2"
+one_of = "modpack"
+dest = "{install_dir}/mo2"
 parts = [
   { filename = "zona_multipart.7z.001", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.001", md5 = "1ce9948b78e0ec33f5aa584ead32c9a5" },
   { filename = "zona_multipart.7z.002", url = "https://github.com/gtair/filehost-1/releases/download/v1.38/zona_multipart.7z.002", md5 = "dc56ba05dcce7ee968fb478fa18676b0" },
@@ -81,7 +111,8 @@ variant = "clean"
 filename = "clean_hud.7z"
 url = "https://github.com/gtair/filehost-1/releases/download/v1.38/clean_hud.7z"
 md5 = "9261b48994c85707383cef1ccf8e5e97"
-dest = "{install_dir}/{drive_c}/mo2/mods"
+dest = "{install_dir}/anomaly"
+strip_components = 1
 
 
 [[artifacts]]
@@ -91,4 +122,5 @@ variant = "bhs"
 filename = "bhs_hud.7z"
 url = "https://github.com/gtair/filehost-1/releases/download/v1.38/bhs_hud.7z"
 md5 = "88544192fbf20e465fef7e7434e6cdb2"
-dest = "{install_dir}/{drive_c}/mo2/mods"
+dest = "{install_dir}/anomaly"
+strip_components = 1
