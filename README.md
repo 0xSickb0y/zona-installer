@@ -25,6 +25,7 @@ Linux installer for the **ZONA** modpack for S.T.A.L.K.E.R.: Anomaly, written in
 ```sh
 git clone https://github.com/0xSickb0y/zona-installer
 cd zona-installer
+python3 -m venv .venv && source .venv/bin/activate
 pip install .
 zona --help
 ```
