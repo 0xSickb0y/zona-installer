@@ -115,6 +115,13 @@ def cli_arguments():
         action="store_true",
         help="Also add Mod Organizer 2 to the Steam library"
     )
+    exes = read_toml_configs()["choices"]["exes"]
+    install_parser.add_argument(
+        "-e", "--modded-exes",
+        choices=exes["options"],
+        metavar="{" + ",".join(exes["options"]) + "}",
+        help=f"Which modded exes to install: regular, or mt (multithreaded test build) (default: {exes['default']})",
+    )
     install_parser.add_argument(
         "--mo2-stylesheet",
         action="store_true",

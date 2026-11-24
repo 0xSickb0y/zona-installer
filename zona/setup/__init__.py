@@ -50,7 +50,7 @@ def run(paths, skip_archive_cleanup=False):
 
         SELECTED_ARTIFACTS = [
             a for a in select_artifacts(
-                ARTIFACTS, TOML_CONFIG["choices"], hud=paths.get("hud")
+                ARTIFACTS, TOML_CONFIG["choices"], hud=paths.get("hud"), exes=paths.get("exes")
             )
             if a["id"] != "ge_proton"
         ]

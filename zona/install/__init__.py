@@ -49,16 +49,21 @@ def run(paths, modpack_source):
                 logger.error("- [Could not launch the game, aborting]")
                 raise SystemExit(1)
 
-        exes_artifact = selected_exes_variant()
+        exes_artifact = selected_exes_variant(paths)
+        variant = exes_artifact["variant"]
         exes_target = dest / "db" / "mods" / "00_modded_exes_gamedata.db0"
-        if exes_target.exists():
-            logger.info(f"- [Modded exes already installed in '{exes_target.parent}', skipping extraction]")
+        # both variants install the same files: the marker tells which one is there now
+        exes_marker = dest / "db" / "mods" / ".zona_modded_exes"
+        installed_variant = exes_marker.read_text().strip() if exes_marker.is_file() else None
+        if exes_target.exists() and installed_variant == variant:
+            logger.info(f"- [Modded exes ({variant}) already installed in '{exes_target.parent}', skipping extraction]")
         else:
             path_ops.backup_original_bin(dest)
-            logger.info(f"- [Extracting {exes_artifact['id']} ({exes_artifact['variant']})]")
+            logger.info(f"- [Extracting {exes_artifact['id']} ({variant})]")
             if not extract.extract_artifact(ARTIFACTS, exes_artifact["id"], paths):
                 logger.error("- [Could not extract the selected exes variant, aborting]")
                 raise SystemExit(1)
+            exes_marker.write_text(variant + "\n")
 
         clear_shader_cache(dest)
 
@@ -122,10 +127,9 @@ def run(paths, modpack_source):
 
 
 # TODO: move to proper module
-def selected_exes_variant():
-    """Return the chosen exes artifact for the current install."""
-    choices = TOML_CONFIG["choices"]
-    chosen = choices["exes"]["default"]
+def selected_exes_variant(paths):
+    """Return the chosen exes artifact (--modded-exes, else config.toml's default)."""
+    chosen = paths.get("exes") or TOML_CONFIG["choices"]["exes"]["default"]
     return next(a for a in ARTIFACTS if a.get("group") == "exes" and a.get("variant") == chosen)
 
 

@@ -62,7 +62,7 @@ To work on the installer itself, use `pip install -e .` instead, so `zona` runs 
 > | Archive | File name(s) |
 > |---|---|
 > | Anomaly 1.5.3 | `Anomaly-1.5.3-Full.7z` (torrent) **or** `Anomaly-1.5.3-Full.2.7z` (ModDB) |
-> | Modded exes | `STALKER-Anomaly-modded-exes_2026.9.12.zip` |
+> | Modded exes | `STALKER-Anomaly-modded-exes_2026.9.12.zip` (default) **or** `STALKER-Anomaly-modded-exes-MT-TEST_2026.9.12.zip` (`--modded-exes mt`) |
 > | Mod Organizer 2 | `Mod.Organizer-2.5.2.7z` |
 > | ZONA profiles | `zona_profiles.7z` |
 > | ZONA modpack | `Zona v1.38.7z` **or** all of `zona_multipart.7z.001` … `.007` |
@@ -98,6 +98,7 @@ To work on the installer itself, use `pip install -e .` instead, so `zona` runs 
 | `--mo2-stylesheet`         | install                               | Also install and activate the S.T.A.L.K.E.R. MO2 theme |
 | `--clean-hud`              | install                               | Install the clean HUD (default)                     |
 | `--bhs-hud`                | install                               | Install the BHS HUD; disables the Medik health monitor mods in the SSS23.5 profile |
+| `-e`, `--modded-exes {regular,mt}` | install                      | Which modded exes to install (default `regular`); see below |
 
 ### HUD
 
@@ -117,6 +118,22 @@ zona install --bhs-hud    # BHS HUD
 >   mods back on. `modlist.txt` is backed up as `modlist.txt.bak` before each change.
 > - Both HUDs replace Anomaly's `appdata/user.ltx` and `gamedata/configs/axr_options.ltx`. The originals are
 >   kept once as `user.ltx.bak` and `axr_options.ltx.bak`.
+
+### Modded exes
+
+ZONA runs on the modded exes, in one of two builds. **`regular` is the default.**
+
+```sh
+zona install                       # regular modded exes
+zona install --modded-exes mt      # MT (multithreaded test) build
+```
+
+> **Note**
+> - Only the chosen build is downloaded and installed.
+> - The MT build is a test build of the modded exes; use `regular` if you run into problems.
+> - You can switch later: re-run `zona install` with the other value. zona remembers which build is installed
+>   and only re-extracts when the choice changes. Anomaly's original `bin` folder is backed up once as
+>   `bin (Anomaly Original)` before the first modded exes are installed.
 
 ### Steam integration
 

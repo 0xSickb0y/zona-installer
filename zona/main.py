@@ -35,6 +35,8 @@ def main():
         logger.warning("- [-s is ignored when -r is given: the -r runner is used]")
     # --clean-hud / --bhs-hud, else config.toml's default (clean)
     paths["hud"] = getattr(args, "hud", None) or config.read_toml_configs()["choices"]["hud"]["default"]
+    # --modded-exes regular|mt, else config.toml's default (regular)
+    paths["exes"] = getattr(args, "modded_exes", None) or config.read_toml_configs()["choices"]["exes"]["default"]
 
     print(f"S.T.A.L.K.E.R.: Anomaly - ZONA modpack v{version} installer for Linux.")
 
