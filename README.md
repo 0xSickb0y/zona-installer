@@ -54,7 +54,7 @@ zona --help
 
 To work on the installer itself, use `pip install -e .` instead, so `zona` runs your edited files directly.
 
-> **Already have the archives?** You don't have to torrent or re-download anything. Drop the files into the
+> ⚠️ **Already have the archives?** You don't have to torrent or re-download anything. Drop the files into the
 > archives folder (`~/Games/.zona_archives` by default, or the folder you pass with `-a`) and run `zona install`
 > as usual. zona checks what is already there, verifies each file's MD5 and only downloads what is missing or
 > corrupted. The file names must match exactly:
