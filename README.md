@@ -78,7 +78,7 @@ To work on the installer itself, use `pip install -e .` instead, so `zona` runs 
 | `zona download` | working     | Download the archives and verify their checksums, without touching the prefix |
 | `zona setup`    | working     | Download/verify the archives, create the directories, set up GE-Proton and the prefix |
 | `zona install`  | working     | Run `setup`, then extract Anomaly, the modded exes, HUD, MO2, profiles and the modpack, and write the MO2 INIs |
-| `zona mo2`      | working     | Launch Mod Organizer 2 through GE-Proton                                    |
+| `zona mo2`      | working     | Launch Mod Organizer 2 through Proton                                    |
 | `zona steam`    | working     | Add MO2 to the Steam library as a non-Steam game (forced to GE-Proton)      |
 | `zona stylesheet` | working   | Install and activate the S.T.A.L.K.E.R. theme in an existing MO2           |
 | `zona keybinds` | working     | Open the ZONA keybind pictures in the default image viewer                  |
