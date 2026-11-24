@@ -72,6 +72,17 @@ def cli_arguments():
 
     sub = parser.add_subparsers(dest="command", metavar="<command>")
 
+    hud_parser = argparse.ArgumentParser(add_help=False)
+    hud_choice = hud_parser.add_mutually_exclusive_group()
+    hud_choice.add_argument(
+        "--clean-hud", dest="hud", action="store_const", const="clean",
+        help="Install the clean HUD (default)",
+    )
+    hud_choice.add_argument(
+        "--bhs-hud", dest="hud", action="store_const", const="bhs",
+        help="Install the BHS HUD (disables the Medik health monitor mods in the SSS23.5 profile)",
+    )
+
     download_parser = argparse.ArgumentParser(add_help=False)
     download_parser.add_argument(
         "-a", "--archives-dir",
@@ -95,7 +106,7 @@ def cli_arguments():
 
     install_parser = sub.add_parser(
         "install",
-        parents=[common],
+        parents=[common, hud_parser],
         help="Download and install the modpack",
         description="Verify and install the ZONA modpack.",
     )
@@ -171,6 +182,12 @@ def cli_arguments():
         parents=[stylesheet_parser],
         help="Install and activate the S.T.A.L.K.E.R. theme in an existing Mod Organizer 2",
         description="Copy the S.T.A.L.K.E.R. theme into Mod Organizer 2's stylesheets folder and make it the active style.",
+    )
+
+    sub.add_parser(
+        "keybinds",
+        help="Show the ZONA keybinds (opens both pictures in your image viewer)",
+        description="Open the ZONA keybind cheat sheets in the default image viewer.",
     )
 
     args = parser.parse_args()

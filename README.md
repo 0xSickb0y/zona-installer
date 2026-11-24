@@ -22,13 +22,56 @@ Linux installer for the **ZONA** modpack for S.T.A.L.K.E.R.: Anomaly, written in
 
 ## Usage
 
+### 1. Get the installer
+
 ```sh
 git clone https://github.com/0xSickb0y/zona-installer
 cd zona-installer
-python3 -m venv .venv && source .venv/bin/activate # optional
+```
+
+### 2. Create a virtual environment (optional)
+
+```sh
+python3 -m venv .venv
+```
+
+Then activate it with the line for your shell:
+
+| Shell        | Command                          |
+|--------------|----------------------------------|
+| bash / zsh   | `source .venv/bin/activate`      |
+| fish         | `source .venv/bin/activate.fish` |
+| csh / tcsh   | `source .venv/bin/activate.csh`  |
+
+Run the activation again in every new terminal before using `zona`.
+
+### 3. Install and run
+
+```sh
 pip install .
 zona --help
 ```
+
+To work on the installer itself, use `pip install -e .` instead, so `zona` runs your edited files directly.
+
+> **Already have the archives?** You don't have to torrent or re-download anything. Drop the files into the
+> archives folder (`~/Games/.zona_archives` by default, or the folder you pass with `-a`) and run `zona install`
+> as usual. zona checks what is already there, verifies each file's MD5 and only downloads what is missing or
+> corrupted. The file names must match exactly:
+>
+> | Archive | File name(s) |
+> |---|---|
+> | Anomaly 1.5.3 | `Anomaly-1.5.3-Full.7z` (torrent) **or** `Anomaly-1.5.3-Full.2.7z` (ModDB) |
+> | Modded exes | `STALKER-Anomaly-modded-exes_2026.9.12.zip` |
+> | Mod Organizer 2 | `Mod.Organizer-2.5.2.7z` |
+> | ZONA profiles | `zona_profiles.7z` |
+> | ZONA modpack | `Zona v1.38.7z` **or** all of `zona_multipart.7z.001` … `.007` |
+> | HUD | `bhs_hud.7z` and/or `clean_hud.7z` |
+>
+> A file with the right name but a wrong MD5 is treated as corrupted, and zona offers to replace it.
+> GE-Proton is not needed in this folder: any Proton already installed is used (see `-r`).
+
+### Commands
 
 | Command         | Status      | Description                                                                 |
 |-----------------|-------------|-----------------------------------------------------------------------------|
@@ -38,6 +81,7 @@ zona --help
 | `zona mo2`      | working     | Launch Mod Organizer 2 through GE-Proton                                    |
 | `zona steam`    | working     | Add MO2 to the Steam library as a non-Steam game (forced to GE-Proton)      |
 | `zona stylesheet` | working   | Install and activate the S.T.A.L.K.E.R. theme in an existing MO2           |
+| `zona keybinds` | working     | Open the ZONA keybind pictures in the default image viewer                  |
 | `zona delete`   | planned     | Remove the installed files and directories                                  |
 
 ### Options
@@ -45,13 +89,34 @@ zona --help
 | Flag                       | Commands                              | Description                                         |
 |----------------------------|---------------------------------------|-----------------------------------------------------|
 | `-b`, `--no-banner`        | all (before the command)              | Hide the startup banner                             |
-| `-i`, `--install-dir DIR`  | setup, install, delete, mo2, steam    | Where ZONA is installed (default `~/Games/ZONA`)    |
+| `-i`, `--install-dir DIR`  | setup, install, delete, mo2, steam, stylesheet | Where ZONA is installed (default `~/Games/ZONA`)    |
 | `-a`, `--archives-dir DIR` | download, setup, install, delete      | Where archives are stored (default `~/Games/.zona_archives`) |
 | `-s`, `--steam-runners DIR`| setup, install, delete, mo2, steam    | Where GE-Proton is looked up / stored (default: Steam's `compatibilitytools.d`) |
 | `-r`, `--runner DIR`       | setup, install, delete, mo2, steam    | Use this Proton instead of GE-Proton, e.g. `~/.steam/steam/steamapps/common/Proton - Experimental` |
-| `-p`, `--proton-prefix DIR`| setup, install, delete, mo2, steam    | Proton prefix to use (default: `<steam>/compatdata/999999/pfx`) |
+| `-p`, `--proton-prefix DIR`| setup, install, delete, mo2           | Proton prefix to use (default: `<steam>/compatdata/999999/pfx`; not with `--steam`) |
 | `--steam`                  | install                               | Also add MO2 to the Steam library                   |
 | `--mo2-stylesheet`         | install                               | Also install and activate the S.T.A.L.K.E.R. MO2 theme |
+| `--clean-hud`              | install                               | Install the clean HUD (default)                     |
+| `--bhs-hud`                | install                               | Install the BHS HUD; disables the Medik health monitor mods in the SSS23.5 profile |
+
+### HUD
+
+ZONA comes with two HUDs. Pick one at install time; the **clean HUD is the default**.
+
+```sh
+zona install              # clean HUD
+zona install --bhs-hud    # BHS HUD
+```
+
+> **Note**
+> - The clean HUD is meant for the `ZONA V1.38 SSS23.5 (High Graphics)` profile; select that profile in MO2.
+> - `--bhs-hud` also **disables** two mods in the SSS23.5 profile:
+>   `New v1.38 Medik Health Monitor by sulikz Jeremussy Adapted by Drako` (priority 344) and
+>   `New v1.38 Medik Health Monitor Presetting` (priority 357). Other profiles are not touched.
+> - You can switch later: re-run `zona install` with the other flag. Choosing the clean HUD turns those two
+>   mods back on. `modlist.txt` is backed up as `modlist.txt.bak` before each change.
+> - Both HUDs replace Anomaly's `appdata/user.ltx` and `gamedata/configs/axr_options.ltx`. The originals are
+>   kept once as `user.ltx.bak` and `axr_options.ltx.bak`.
 
 ### Steam integration
 

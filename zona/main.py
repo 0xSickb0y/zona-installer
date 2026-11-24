@@ -3,6 +3,7 @@ import sys
 import shutil
 from pathlib import Path
 from zona import mo2
+from zona import keybinds
 from zona.mo2 import stylesheet
 from zona import setup
 from zona import install
@@ -30,6 +31,10 @@ def main():
         getattr(args, "proton_prefix", None),
         getattr(args, "runner", None),
     )
+    if getattr(args, "runner", None) and getattr(args, "runners_dir", None):
+        logger.warning("- [-s is ignored when -r is given: the -r runner is used]")
+    # --clean-hud / --bhs-hud, else config.toml's default (clean)
+    paths["hud"] = getattr(args, "hud", None) or config.read_toml_configs()["choices"]["hud"]["default"]
 
     print(f"S.T.A.L.K.E.R.: Anomaly - ZONA modpack v{version} installer for Linux.")
 
@@ -65,7 +70,10 @@ def main():
         setup.run(paths)
 
     if args.command == "install":
-        if not args.steam and path_ops.steam_installed():
+        if args.steam and args.proton_prefix:
+            logger.error("- [-p can't be combined with --steam: Steam decides the prefix (compatdata/<appid>)]")
+            raise SystemExit(1)
+        if not args.steam and not args.proton_prefix and path_ops.steam_installed():
             logger.info("- [Steam detected]")
             args.steam = utils.yes_or_no("Set up the Steam integration? [y/N] >>> ", default=False)
         if args.steam and steam.steam_running():
@@ -82,15 +90,14 @@ def main():
         if args.mo2_stylesheet and not stylesheet.install_stylesheet(mo2_dir(paths)):
             logger.error("- [Could not install the MO2 stylesheet]")
             raise SystemExit(1)
-        if args.steam and not use_steam_prefix(args, paths):
-            logger.error("- [Could not set up the Steam prefix, aborting]")
-            raise SystemExit(1)
         if args.steam and not steam.add_to_library(paths):
             logger.error("- [Failed to add Mod Organizer 2 to the Steam library]")
             raise SystemExit(1)
 
     if args.command == "mo2":
         logger.info("- [Running ZONA Mod Organizer 2]\n")
+        if not args.proton_prefix:
+            use_existing_steam_prefix(paths)
         if args.mo2_stylesheet and not stylesheet.install_stylesheet(mo2_dir(paths)):
             logger.error("- [Could not install the MO2 stylesheet]")
             raise SystemExit(1)
@@ -100,6 +107,9 @@ def main():
     if args.command == "steam":
         logger.info("- [Adding Mod Organizer 2 to the Steam library]\n")
         if not use_steam_install_dir(args, paths):
+            raise SystemExit(1)
+        if not use_steam_prefix(args, paths):
+            logger.error("- [Could not set up the Steam prefix, aborting]")
             raise SystemExit(1)
         if not steam.add_to_library(paths):
             logger.error("- [Failed to add Mod Organizer 2 to the Steam library]")
@@ -111,16 +121,32 @@ def main():
             logger.error("- [Could not install the MO2 stylesheet]")
             raise SystemExit(1)
 
+    if args.command == "keybinds":
+        if not keybinds.run():
+            raise SystemExit(1)
+
     if args.command == "delete":
         # logger.info("- [Initializing ZONA modpack removal]\n")
         # delete.run(paths)
-        pass
+        logger.error("- ['zona delete' is not implemented yet]")
+        raise SystemExit(1)
 
 
 def mo2_dir(paths):
     """The MO2 folder of the install, from the mo2 artifact's dest in config.toml."""
     mo2 = next(a for a in config.read_toml_configs()["artifacts"] if a["id"] == "mo2")
     return Path(mo2["dest"].format(**paths))
+
+
+def use_existing_steam_prefix(paths):
+    """If this install was added to Steam (its shortcut prefix exists), run in that prefix:
+    it is the one zona set up. Otherwise keep the default prefix."""
+    if path_ops.find_steam_root() is None:
+        return
+    prefix = steam.shortcut_prefix(paths)
+    if prefix is not None and (prefix / "drive_c").is_dir():
+        paths["wine_prefix_dir"] = prefix
+        logger.info(f"- [Using the Steam shortcut's prefix: {prefix}]")
 
 
 def steam_mode(args):
@@ -144,7 +170,7 @@ def use_steam_install_dir(args, paths):
 def use_steam_prefix(args, paths):
     """Point wine_prefix_dir at the prefix Steam uses for the shortcut. Returns True on success."""
     if args.proton_prefix:
-        logger.warning("- [-p is ignored with --steam: Steam decides the prefix]")
+        logger.error("- [-p can't be used with the Steam integration: Steam decides the prefix (compatdata/<appid>)]")
         return False
     if args.install_dir:
         library = steam.find_library(paths["install_dir"])

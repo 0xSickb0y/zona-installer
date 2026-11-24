@@ -62,7 +62,8 @@ def run(paths, modpack_source):
 
         clear_shader_cache(dest)
 
-        hud_artifact = selected_hud_variant()
+        hud_artifact = selected_hud_variant(paths)
+        logger.info(f"- [HUD: {hud_artifact['variant']}]")
         if hud_artifact["variant"] == "clean":
             logger.warning(
                 "- [Clean HUD requires using the SSS23.5 profile in mo2]"
@@ -96,6 +97,10 @@ def run(paths, modpack_source):
             logger.error("- [Could not extract the ZONA modpack, aborting]")
             raise SystemExit(1)
 
+        if not apply_hud_profile(profiles_dir, hud_artifact["variant"]):
+            logger.error("- [Could not update the profile for the selected HUD, aborting]")
+            raise SystemExit(1)
+
 
         print()
         logger.info("- [Writing ModOrganizer2 .INI Files]")
@@ -125,11 +130,28 @@ def selected_exes_variant():
 
 
 # TODO: move to proper module
-def selected_hud_variant():
-    """Return the chosen HUD artifact for the current install."""
-    choices = TOML_CONFIG["choices"]
-    chosen = choices["hud"]["default"]
+def selected_hud_variant(paths):
+    """Return the chosen HUD artifact (--clean-hud / --bhs-hud, else config.toml's default)."""
+    chosen = paths.get("hud") or TOML_CONFIG["choices"]["hud"]["default"]
     return next(a for a in ARTIFACTS if a.get("group") == "hud" and a.get("variant") == chosen)
+
+
+def apply_hud_profile(profiles_dir, variant):
+    """BHS HUD: disable the mods listed under the hud_bhs artifact in its profile.
+    Any other HUD re-enables them, so switching HUDs on a re-run works both ways."""
+    from zona.mo2 import modlist  # local: zona.mo2 imports from zona.install (circular at module level)
+
+    bhs = next(a for a in ARTIFACTS if a["id"] == "hud_bhs")
+    profile, names = bhs.get("disable_in_profile"), bhs.get("disable_mods", [])
+    if not profile or not names:
+        return True
+    enable = variant != "bhs"
+    profile_dir = Path(profiles_dir) / profile
+    if not profile_dir.is_dir():
+        logger.warning(f"- [Profile '{profile}' not found, skipping the HUD mod changes]")
+        return True
+    logger.info(f"- [{'Enabling' if enable else 'Disabling'} {len(names)} mod(s) in '{profile}' for the {variant} HUD]")
+    return modlist.set_mods_enabled(profile_dir, names, enabled=enable)
 
 
 # TODO: move to proper module

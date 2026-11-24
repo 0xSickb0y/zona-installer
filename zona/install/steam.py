@@ -1,6 +1,7 @@
 import re
 import vdf
 import zlib
+import shutil
 import subprocess
 from pathlib import Path
 from zona.core.log import logger
@@ -11,6 +12,16 @@ from zona.setup import path_ops, runner
 
 
 SHORTCUT_NAME = "S.T.A.L.K.E.R.: ZONA"  # title shown in the Steam library
+SHORTCUT_SORT_AS = "S.T.A.K.E.R.: ZONA"  # Steam's "Custom Sort Name"
+STEAM_ASSETS = Path(__file__).parent.parent / "assets" / "steam"
+SHORTCUT_ICON = "zona_splash_icon.png"
+# Library artwork, copied into userdata/<user>/config/grid/ as <appid><suffix>.<png|jpg>
+GRID_ARTWORK = {
+    "p": "cover_600x900.jpg",              # cover (portrait capsule)
+    "": "wide-cover_920x430.jpeg",         # wide cover
+    "_hero": "background_3840x1240.jpg",   # background
+    "_logo": "logo_720x720.png",           # logo over the background
+}
 FLATPAK_APP_ID = "com.valvesoftware.Steam"
 
 
@@ -27,7 +38,7 @@ def shortcut_appid(exe, name):
     return zlib.crc32(f'"{exe}"{name}'.encode()) | 0x80000000
 
 
-def add_shortcut(shortcuts_file, name, exe, start_dir, launch_options):
+def add_shortcut(shortcuts_file, name, exe, start_dir, launch_options, icon="", sort_as=""):
     """Add the shortcut to a user's shortcuts.vdf, or refresh it if one with this name exists."""
     appid = shortcut_appid(exe, name)
     raw = shortcuts_file.read_bytes() if shortcuts_file.exists() else b""
@@ -43,18 +54,48 @@ def add_shortcut(shortcuts_file, name, exe, start_dir, launch_options):
             "DevkitGameID": "", "DevkitOverrideAppID": 0, "LastPlayTime": 0,
             "FlatpakAppID": "", "tags": {},
         }
-    # only these fields are ours; anything the user customized (tags, launch options) is kept
-    shortcuts[slot].update({
-        "appid": appid - 2**32, # stored as signed 32-bit int
-        "appname": name,
-        "exe": f'"{exe}"',
+    # only these fields are ours; anything else the user customized (tags, ...) is kept
+    entry = shortcuts[slot]
+    fields = {
+        "appid": appid - 2**32,  # stored as signed 32-bit int
+        "AppName": name,
+        "Exe": f'"{exe}"',
         "StartDir": f'"{start_dir}"',
         "LaunchOptions": launch_options,
-    })
+        "icon": icon,
+        "sortas": sort_as,
+    }
+    for key, value in fields.items():
+        # Steam writes 'AppName'/'Exe', older files may say 'appname'/'exe': update whichever exists
+        existing = next((k for k in entry if k.lower() == key.lower()), key)
+        entry[existing] = value
 
     shortcuts_file.parent.mkdir(parents=True, exist_ok=True)
     shortcuts_file.write_bytes(vdf.binary_dumps(data))
     return appid
+
+
+def install_artwork(user, appid):
+    """Copy the library artwork and the icon into the user's grid folder.
+    Returns the icon's path (for the shortcut's 'icon' field), or None on failure."""
+    grid = user / "config" / "grid"
+    try:
+        grid.mkdir(parents=True, exist_ok=True)
+        for suffix, asset in GRID_ARTWORK.items():
+            name = f"{appid}{suffix}"
+            # an older .jpg/.webp for the same slot could win over ours: remove it
+            for old in grid.glob(f"{name}.*"):
+                if old.suffix.lower() in (".jpg", ".jpeg", ".webp", ".png") and old.stem == name:
+                    old.unlink()
+            # keep the real image type; Steam's grid reads .png and .jpg (not .jpeg)
+            extension = ".jpg" if Path(asset).suffix.lower() in (".jpg", ".jpeg") else ".png"
+            shutil.copy2(STEAM_ASSETS / asset, grid / f"{name}{extension}")
+        icon = grid / f"{appid}_icon.png"
+        shutil.copy2(STEAM_ASSETS / SHORTCUT_ICON, icon)
+    except OSError as error:
+        logger.error(f"- [Could not copy the Steam artwork into '{grid}': {error}]")
+        return None
+    return icon
 
 
 def set_compat_tool(config_vdf, appid, tool):
@@ -150,11 +191,16 @@ def add_to_library(paths):
     appid = shortcut_appid(exe, SHORTCUT_NAME)
     launch_options = f'WINEDLLOVERRIDES="{runner.DLL_OVERRIDES}" %command%' if runner.DLL_OVERRIDES else ""
     for user in users:
+        icon = install_artwork(user, appid)
+        if icon is None:
+            return False
+        logger.info(f"- [Steam artwork installed for Steam user {user.name}]")
+
         shortcuts_file = user / "config" / "shortcuts.vdf"
         if shortcuts_file.exists():
             path_ops.backup_file(shortcuts_file)
         try:
-            add_shortcut(shortcuts_file, SHORTCUT_NAME, exe, mo2_dir, launch_options)
+            add_shortcut(shortcuts_file, SHORTCUT_NAME, exe, mo2_dir, launch_options, str(icon), SHORTCUT_SORT_AS)
         except (OSError, SyntaxError, ValueError) as error:
             logger.error(f"- [Could not update '{shortcuts_file}': {error}]")
             return False
