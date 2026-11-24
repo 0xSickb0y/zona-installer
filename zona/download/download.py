@@ -118,7 +118,8 @@ def ensure_archives(artifacts, ARCHIVES_DIR, retries=1):
             results[item["filename"]] = None
 
     if present:
-        print("Initiating MD5 Checksums")
+        logger.info(f"- [Archives already present at {ARCHIVES_DIR}]")
+        print("\nInitiating MD5 Checksums")
         _, checksum_results = hash_verification.verify_archives([{"parts": present}], ARCHIVES_DIR)
         results.update(checksum_results)
     corrupted = [i for i in present if results[i["filename"]] is not True]

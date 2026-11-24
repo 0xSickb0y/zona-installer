@@ -56,7 +56,7 @@ def run(paths, modpack_source):
         exes_marker = dest / "db" / "mods" / ".zona_modded_exes"
         installed_variant = exes_marker.read_text().strip() if exes_marker.is_file() else None
         if exes_target.exists() and installed_variant == variant:
-            logger.info(f"- [Modded exes ({variant}) already installed in '{exes_target.parent}', skipping extraction]")
+            logger.info(f"- [Modded exes ({variant}) already installed in '{dest / 'bin'}', skipping extraction]")
         else:
             path_ops.backup_original_bin(dest)
             logger.info(f"- [Extracting {exes_artifact['id']} ({variant})]")
@@ -67,19 +67,7 @@ def run(paths, modpack_source):
 
         clear_shader_cache(dest)
 
-        hud_artifact = selected_hud_variant(paths)
-        logger.info(f"- [HUD: {hud_artifact['variant']}]")
-        if hud_artifact["variant"] == "clean":
-            logger.warning(
-                "- [Clean HUD requires using the SSS23.5 profile in mo2]"
-            )
-
-        # The HUD replaces Anomaly's own user.ltx / axr_options.ltx: keep the originals first,
-        # then overwrite without asking. Never overwrite them if the backup failed.
-        if not backup_runtime_config_files(dest):
-            logger.error("- [Could not back up 'user.ltx' and 'axr_options.ltx', skipping the HUD]")
-        elif not extract.extract_artifact(ARTIFACTS, hud_artifact["id"], paths, overwrite=True):
-            logger.info("- [Skipped extraction of the selected HUD variant]")
+        hud_artifact = install_hud_files(paths, dest)
 
         mo2 = next(a for a in ARTIFACTS if a["id"] == "mo2")
         mo2_dir = Path(mo2["dest"].format(**paths))
@@ -106,7 +94,6 @@ def run(paths, modpack_source):
             logger.error("- [Could not update the profile for the selected HUD, aborting]")
             raise SystemExit(1)
 
-
         print()
         logger.info("- [Writing ModOrganizer2 .INI Files]")
         profile_name = default_profile_name(mo2_dir)
@@ -122,7 +109,7 @@ def run(paths, modpack_source):
             duration = time.perf_counter() - start
             print()
             logger.info(f"- [zona install completed in {duration:.2f}s]")
-            print("Installation completed. Good Hunting S.T.A.L.K.E.R.!")
+            print("\nInstallation completed. Good Hunting S.T.A.L.K.E.R.!")
             print("run: 'zona mo2' to launch Mod Organizer 2.\n")
 
 
@@ -138,6 +125,47 @@ def selected_hud_variant(paths):
     """Return the chosen HUD artifact (--clean-hud / --bhs-hud, else config.toml's default)."""
     chosen = paths.get("hud") or TOML_CONFIG["choices"]["hud"]["default"]
     return next(a for a in ARTIFACTS if a.get("group") == "hud" and a.get("variant") == chosen)
+
+
+def install_hud_files(paths, anomaly_dir):
+    """Extract the chosen HUD into Anomaly, backing up user.ltx / axr_options.ltx first.
+    Returns the HUD artifact. A failed backup or extraction is logged, not fatal."""
+    hud_artifact = selected_hud_variant(paths)
+    logger.info(f"- [HUD: {hud_artifact['variant']}]")
+    if hud_artifact["variant"] == "clean":
+        logger.warning("- [Clean HUD requires using the SSS23.5 profile in mo2]")
+
+    # The HUD replaces Anomaly's own user.ltx / axr_options.ltx: keep the originals first,
+    # then overwrite without asking. Never overwrite them if the backup failed.
+    if not backup_runtime_config_files(anomaly_dir):
+        logger.error("- [Could not back up 'user.ltx' and 'axr_options.ltx', skipping the HUD]")
+    elif not extract.extract_artifact(ARTIFACTS, hud_artifact["id"], paths, overwrite=True):
+        logger.info("- [Skipped extraction of the selected HUD variant]")
+    return hud_artifact
+
+
+def apply_hud(paths):
+    """Switch an existing install to the chosen HUD (zona mo2 --clean-hud/--bhs-hud):
+    fetch its archive if needed, extract it and adjust the SSS23.5 profile. Returns True on success."""
+    from zona.download import download  # local: keeps zona.install's imports light
+
+    anomaly = next(a for a in ARTIFACTS if a["id"] == "anomaly")
+    mo2 = next(a for a in ARTIFACTS if a["id"] == "mo2")
+    anomaly_dir = Path(anomaly["dest"].format(**paths))
+    mo2_dir = Path(mo2["dest"].format(**paths))
+    if not (anomaly_dir / "AnomalyLauncher.exe").exists() or not profiles_installed(mo2_dir / "profiles"):
+        logger.error(f"- [No ZONA install found in '{paths['install_dir']}': run 'zona install' first]")
+        return False
+
+    hud = selected_hud_variant(paths)
+    path_ops.create_directories((Path(paths["archives_dir"]),))
+    ok, _ = download.ensure_archives([hud], paths["archives_dir"])
+    if not ok:
+        logger.error(f"- [Could not get {hud['filename']}]")
+        return False
+
+    install_hud_files(paths, anomaly_dir)
+    return apply_hud_profile(mo2_dir / "profiles", hud["variant"])
 
 
 def apply_hud_profile(profiles_dir, variant):

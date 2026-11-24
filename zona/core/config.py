@@ -161,9 +161,14 @@ def cli_arguments():
 
     mo2_command = sub.add_parser(
         "mo2",
-        parents=[mo2_parser],
+        parents=[mo2_parser, hud_parser],
         help="Install or validate just Mod Organizer 2 in the Proton prefix",
         description="Ensure the MO2 installation exists without re-running the full modpack install flow.",
+    )
+    mo2_command.add_argument(
+        "-a", "--archives-dir",
+        metavar="DIR",
+        help="Where archives are stored, for --clean-hud/--bhs-hud (default: archives_dir from config.toml)",
     )
     mo2_command.add_argument(
         "--mo2-stylesheet",
@@ -197,9 +202,28 @@ def cli_arguments():
         description="Open the ZONA keybind cheat sheets in the default image viewer.",
     )
 
+    # -b also works after the command (zona mo2 -b). SUPPRESS: a subcommand without -b
+    # must not overwrite a -b given before the command.
+    for subparser in sub.choices.values():
+        subparser.add_argument(
+            "-b", "--no-banner", action="store_true", default=argparse.SUPPRESS,
+            help="Suppress the startup banner",
+        )
+
     args = parser.parse_args()
 
     if args.command is None:
         parser.print_help()
         raise SystemExit
+
+    # An empty path usually means an unset shell variable (-i "$Z" with Z unset): stop here
+    # instead of silently continuing with no folder.
+    path_flags = {
+        "install_dir": "-i/--install-dir", "archives_dir": "-a/--archives-dir",
+        "runners_dir": "-s/--steam-runners", "runner": "-r/--runner", "proton_prefix": "-p/--proton-prefix",
+    }
+    for dest, flag in path_flags.items():
+        value = getattr(args, dest, None)
+        if value is not None and not value.strip():
+            parser.error(f"{flag} was given an empty path (is the shell variable you used set?)")
     return args

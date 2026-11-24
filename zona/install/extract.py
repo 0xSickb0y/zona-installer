@@ -116,11 +116,14 @@ def extract_archive(filename, ARCHIVES_DIR, dest, strip_components=0, overwrite=
                 for source, target in moves:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(source), str(target))
+                    # 7z's own output shows the temp folder; log where each file really went
+                    logger.info(f"- [Installed {target.relative_to(dest)}]")
         else:
             subprocess.run(
                 [seven_zip, "x", str(archive), f"-o{dest}", "-y"],
                 check=True,
             )
+            print()
 
     except (subprocess.CalledProcessError, OSError) as error:
         logger.error(f"- [Extraction failed: {error}]")
@@ -145,3 +148,4 @@ def extract_artifact(artifacts, artifact_id, paths, overwrite=False):
         strip_components=strip_components,
         overwrite=overwrite,
     )
+    

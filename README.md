@@ -143,8 +143,14 @@ prefix Steam assigns to that shortcut. A few things to know:
 
 - Steam must be **closed**, otherwise it overwrites the library changes when it exits.
 - If Steam is detected, `zona install` asks whether to set up the integration.
-- With `--steam`, `-p` is ignored, since Steam decides the prefix.
+- `-p` can't be combined with `--steam`, since Steam decides the prefix.
 - With `--steam` and `-i`, the install directory must be inside a Steam library.
+- The prefix is stored in **the same Steam library as the install**
+  (`<library>/steamapps/compatdata/<appid>`). Steam itself only looks in the main install's
+  `compatdata`, so when the library is on another drive zona puts a symlink there pointing to the real
+  prefix. A prefix left from an older install in the main location is moved over, not rebuilt.
+- Removing ZONA from the Steam library makes Steam delete its prefix. Re-run
+  `zona install --steam` to rebuild it (the game files are kept and not extracted again).
 
 ### Example
 

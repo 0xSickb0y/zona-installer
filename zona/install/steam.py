@@ -176,7 +176,8 @@ def add_to_library(paths):
     # (zona links GE-Proton into compatibilitytools.d; the link target must be visible too).
     if path_ops.is_flatpak_steam(root):
         logger.info("- [Flatpak Steam detected]")
-        folders = [Path(paths["install_dir"])] + ([] if steam_proton else [proton.parent.resolve()])
+        folders = [Path(paths["install_dir"]), Path(paths["wine_prefix_dir"]).resolve().parent]
+        folders += [] if steam_proton else [proton.parent.resolve()]
         if not ensure_flatpak_access(folders):
             return False
 
@@ -338,6 +339,48 @@ def default_install_dir():
         logger.error("- [Steam install not found]")
         return None
     return root / "steamapps" / "common" / config.read_toml_configs()["project"]["name"]
+
+
+def place_prefix(steam_dir, real_dir):
+    """Keep the shortcut's prefix in `real_dir` (the install's Steam library) and make Steam's
+    fixed location `steam_dir` (<Steam root>/steamapps/compatdata/<appid>) a symlink to it.
+    A prefix already at `steam_dir` is moved over instead of being rebuilt. Returns True on success."""
+    steam_dir, real_dir = Path(steam_dir), Path(real_dir)
+    try:
+        if steam_dir.is_symlink():
+            if steam_dir.resolve() == real_dir.resolve():
+                return True
+        elif steam_dir.is_dir():
+            if real_dir.exists():
+                # both exist: keep the library's copy; link_directory renames this one to .bak
+                logger.warning(f"- [A prefix exists in both '{steam_dir}' and '{real_dir}', using the second]")
+            else:
+                logger.info(f"- [Moving the existing prefix to '{real_dir}' (this can take a while)]")
+                real_dir.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(steam_dir), str(real_dir))
+        real_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        logger.error(f"- [Could not prepare the prefix in '{real_dir}': {error}]")
+        return False
+    return path_ops.link_directory(steam_dir, real_dir)
+
+
+def has_shortcut(exe):
+    """True if any Steam user has a non-Steam shortcut pointing at `exe`."""
+    root = path_ops.find_steam_root()
+    if root is None:
+        return False
+    target = str(Path(exe))
+    for shortcuts_file in (root / "userdata").glob("*/config/shortcuts.vdf"):
+        try:
+            shortcuts = vdf.binary_loads(shortcuts_file.read_bytes()).get("shortcuts", {})
+        except (OSError, SyntaxError, ValueError):
+            continue
+        for entry in shortcuts.values():
+            exe_field = next((v for k, v in entry.items() if k.lower() == "exe"), "")
+            if str(exe_field).strip('"') == target:
+                return True
+    return False
 
 
 def shortcut_prefix(paths):

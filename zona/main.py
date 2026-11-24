@@ -72,6 +72,7 @@ def main():
         setup.run(paths)
 
     if args.command == "install":
+        logger.info("- [Initializing ZONA modpack installation]\n")
         if args.steam and args.proton_prefix:
             logger.error("- [-p can't be combined with --steam: Steam decides the prefix (compatdata/<appid>)]")
             raise SystemExit(1)
@@ -86,7 +87,6 @@ def main():
         if args.steam and not use_steam_prefix(args, paths):
             logger.error("- [Could not set up the Steam prefix, aborting]")
             raise SystemExit(1)
-        logger.info("- [Initializing ZONA modpack installation]\n")
         modpack_source = setup.run(paths)
         install.run(paths, modpack_source)
         if args.mo2_stylesheet and not stylesheet.install_stylesheet(mo2_dir(paths)):
@@ -98,8 +98,11 @@ def main():
 
     if args.command == "mo2":
         logger.info("- [Running ZONA Mod Organizer 2]\n")
-        if not args.proton_prefix:
-            use_existing_steam_prefix(paths)
+        if not args.proton_prefix and not use_existing_steam_prefix(paths):
+            raise SystemExit(1)
+        if args.hud and not install.apply_hud(paths):  # only when --clean-hud/--bhs-hud is given
+            logger.error("- [Could not apply the selected HUD]")
+            raise SystemExit(1)
         if args.mo2_stylesheet and not stylesheet.install_stylesheet(mo2_dir(paths)):
             logger.error("- [Could not install the MO2 stylesheet]")
             raise SystemExit(1)
@@ -141,14 +144,24 @@ def mo2_dir(paths):
 
 
 def use_existing_steam_prefix(paths):
-    """If this install was added to Steam (its shortcut prefix exists), run in that prefix:
-    it is the one zona set up. Otherwise keep the default prefix."""
+    """If this install was added to Steam, run in the shortcut's prefix: it is the one zona set up.
+    Returns False when Steam has the shortcut but its prefix is gone (e.g. removed with the game).
+    Without a shortcut the default prefix is kept."""
     if path_ops.find_steam_root() is None:
-        return
+        return True
     prefix = steam.shortcut_prefix(paths)
-    if prefix is not None and (prefix / "drive_c").is_dir():
+    if prefix is None:
+        return True
+    if (prefix / "drive_c").is_dir():
         paths["wine_prefix_dir"] = prefix
         logger.info(f"- [Using the Steam shortcut's prefix: {prefix}]")
+        return True
+    if steam.has_shortcut(mo2_dir(paths) / "ModOrganizer.exe"):
+        logger.error(f"- [ZONA is in your Steam library, but its Wine prefix is missing: '{prefix.parent}']")
+        logger.error(f"- [Steam deletes it when the game is removed. Rebuild it with: "
+                     f"zona install -i '{paths['install_dir']}' --steam]")
+        return False
+    return True
 
 
 def steam_mode(args):
@@ -170,10 +183,21 @@ def use_steam_install_dir(args, paths):
 
 
 def use_steam_prefix(args, paths):
-    """Point wine_prefix_dir at the prefix Steam uses for the shortcut. Returns True on success."""
+    """Point wine_prefix_dir at the shortcut's prefix, stored in the install's Steam library.
+
+    Steam always looks for a shortcut's prefix in <Steam root>/steamapps/compatdata/<appid>.
+    When ZONA is installed in another library (-i on another drive), the prefix lives in that
+    library's compatdata and Steam's location becomes a symlink to it. Returns True on success."""
     if args.proton_prefix:
         logger.error("- [-p can't be used with the Steam integration: Steam decides the prefix (compatdata/<appid>)]")
         return False
+
+    steam_prefix = steam.shortcut_prefix(paths)  # <Steam root>/steamapps/compatdata/<appid>/pfx
+    if steam_prefix is None:
+        return False
+    root = path_ops.find_steam_root()
+
+    library = root
     if args.install_dir:
         library = steam.find_library(paths["install_dir"])
         if library is None:
@@ -181,9 +205,13 @@ def use_steam_prefix(args, paths):
             return False
         logger.info(f"- [Steam library: {library}]")
 
-    prefix = steam.shortcut_prefix(paths)
-    if prefix is None:
-        return False
+    prefix = steam_prefix
+    if Path(library).resolve() != Path(root).resolve():
+        compat_dir = Path(library) / "steamapps" / "compatdata" / steam_prefix.parent.name
+        if not steam.place_prefix(steam_prefix.parent, compat_dir):
+            return False
+        prefix = compat_dir / "pfx"
+
     paths["wine_prefix_dir"] = prefix
     logger.info(f"- [Steam prefix: {prefix}]")
     return True
