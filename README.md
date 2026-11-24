@@ -37,6 +37,7 @@ zona --help
 | `zona install`  | working     | Run `setup`, then extract Anomaly, the modded exes, HUD, MO2, profiles and the modpack, and write the MO2 INIs |
 | `zona mo2`      | working     | Launch Mod Organizer 2 through GE-Proton                                    |
 | `zona steam`    | working     | Add MO2 to the Steam library as a non-Steam game (forced to GE-Proton)      |
+| `zona stylesheet` | working   | Install and activate the S.T.A.L.K.E.R. theme in an existing MO2           |
 | `zona delete`   | planned     | Remove the installed files and directories                                  |
 
 ### Options
@@ -50,6 +51,7 @@ zona --help
 | `-r`, `--runner DIR`       | setup, install, delete, mo2, steam    | Use this Proton instead of GE-Proton, e.g. `~/.steam/steam/steamapps/common/Proton - Experimental` |
 | `-p`, `--proton-prefix DIR`| setup, install, delete, mo2, steam    | Proton prefix to use (default: `<steam>/compatdata/999999/pfx`) |
 | `--steam`                  | install                               | Also add MO2 to the Steam library                   |
+| `--mo2-stylesheet`         | install                               | Also install and activate the S.T.A.L.K.E.R. MO2 theme |
 
 ### Steam integration
 
@@ -121,7 +123,8 @@ zona/
 │   ├── extract.py            # 7z extraction
 │   └── steam.py              # Steam shortcut, compat tool and prefix
 ├── mo2/
-│   └── __init__.py           # `zona mo2`: launch Mod Organizer 2
+│   ├── __init__.py           # `zona mo2`: launch Mod Organizer 2
+│   └── stylesheet.py         # `zona stylesheet` / --mo2-stylesheet: MO2 theme
 └── templates/
     ├── ModOrganizer.ini      # MO2 config template
     └── nxmhandler.ini        # nxm link handler template

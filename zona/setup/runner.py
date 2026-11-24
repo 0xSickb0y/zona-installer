@@ -176,7 +176,7 @@ def get_proton(paths):
 
     proton = runners[0] if len(runners) == 1 else runners[choose_runner(runners)]
     paths["runner"] = proton.parent
-    logger.info(f"- [Using runner '{proton.parent.name}']")
+    # logger.info(f"- [Using runner '{proton.parent.name}']")
     return proton
 
 

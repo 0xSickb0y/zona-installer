@@ -1,7 +1,9 @@
 import os
 import sys
 import shutil
+from pathlib import Path
 from zona import mo2
+from zona.mo2 import stylesheet
 from zona import setup
 from zona import install
 from zona import download
@@ -77,6 +79,9 @@ def main():
         logger.info("- [Initializing ZONA modpack installation]\n")
         modpack_source = setup.run(paths)
         install.run(paths, modpack_source)
+        if args.mo2_stylesheet and not stylesheet.install_stylesheet(mo2_dir(paths)):
+            logger.error("- [Could not install the MO2 stylesheet]")
+            raise SystemExit(1)
         if args.steam and not use_steam_prefix(args, paths):
             logger.error("- [Could not set up the Steam prefix, aborting]")
             raise SystemExit(1)
@@ -86,6 +91,9 @@ def main():
 
     if args.command == "mo2":
         logger.info("- [Running ZONA Mod Organizer 2]\n")
+        if args.mo2_stylesheet and not stylesheet.install_stylesheet(mo2_dir(paths)):
+            logger.error("- [Could not install the MO2 stylesheet]")
+            raise SystemExit(1)
         mo2.run(paths)
 
 
@@ -97,10 +105,22 @@ def main():
             logger.error("- [Failed to add Mod Organizer 2 to the Steam library]")
             raise SystemExit(1)
 
+    if args.command == "stylesheet":
+        logger.info("- [Installing the S.T.A.L.K.E.R. Mod Organizer 2 stylesheet]\n")
+        if not stylesheet.install_stylesheet(mo2_dir(paths)):
+            logger.error("- [Could not install the MO2 stylesheet]")
+            raise SystemExit(1)
+
     if args.command == "delete":
         # logger.info("- [Initializing ZONA modpack removal]\n")
         # delete.run(paths)
         pass
+
+
+def mo2_dir(paths):
+    """The MO2 folder of the install, from the mo2 artifact's dest in config.toml."""
+    mo2 = next(a for a in config.read_toml_configs()["artifacts"] if a["id"] == "mo2")
+    return Path(mo2["dest"].format(**paths))
 
 
 def steam_mode(args):

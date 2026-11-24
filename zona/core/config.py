@@ -104,6 +104,11 @@ def cli_arguments():
         action="store_true",
         help="Also add Mod Organizer 2 to the Steam library"
     )
+    install_parser.add_argument(
+        "--mo2-stylesheet",
+        action="store_true",
+        help="Also install and activate the S.T.A.L.K.E.R. Mod Organizer 2 theme",
+    )
 
     sub.add_parser(
         "delete",
@@ -136,11 +141,16 @@ def cli_arguments():
         help="Steam Proton prefix to use (typically a compatdata/<appid>/pfx folder; default: Steam-managed runtime path)",
     )
 
-    sub.add_parser(
+    mo2_command = sub.add_parser(
         "mo2",
         parents=[mo2_parser],
         help="Install or validate just Mod Organizer 2 in the Proton prefix",
         description="Ensure the MO2 installation exists without re-running the full modpack install flow.",
+    )
+    mo2_command.add_argument(
+        "--mo2-stylesheet",
+        action="store_true",
+        help="Install and activate the S.T.A.L.K.E.R. theme before launching Mod Organizer 2",
     )
 
     sub.add_parser(
@@ -148,6 +158,19 @@ def cli_arguments():
         parents=[mo2_parser],
         help="Add Mod Organizer 2 to the Steam library as a non-Steam game",
         description="Add ZONA's Mod Organizer 2 to the Steam library, forced to GE-Proton and using the installed prefix. Steam must be closed.",
+    )
+
+    stylesheet_parser = argparse.ArgumentParser(add_help=False)
+    stylesheet_parser.add_argument(
+        "-i", "--install-dir",
+        metavar="DIR",
+        help="Where ZONA is installed (default: install_dir from config.toml)",
+    )
+    sub.add_parser(
+        "stylesheet",
+        parents=[stylesheet_parser],
+        help="Install and activate the S.T.A.L.K.E.R. theme in an existing Mod Organizer 2",
+        description="Copy the S.T.A.L.K.E.R. theme into Mod Organizer 2's stylesheets folder and make it the active style.",
     )
 
     args = parser.parse_args()
