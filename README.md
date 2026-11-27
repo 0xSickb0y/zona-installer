@@ -1,14 +1,18 @@
+<div align="center">
+
 # zona-installer
 
 Linux installer for the **ZONA** modpack for S.T.A.L.K.E.R.: Anomaly, written in Python.
 
-**[Website](https://stalker-zona.com/) · [Discord](https://discord.gg/zona)**
+### **[Website](https://stalker-zona.com/) · [Discord](https://discord.gg/zona)**
 
 ![alt text](zona/assets/readme-banner.png)
 
 > This is an ongoing reimplementation of the existing
 > [johnmnorman/zona-installer](https://github.com/johnmnorman/zona-installer)
 > (a Bash script). It is a work in progress.
+
+</div>
 
 ## Requirements
 
