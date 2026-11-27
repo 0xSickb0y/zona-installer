@@ -72,6 +72,17 @@ def cli_arguments():
 
     sub = parser.add_subparsers(dest="command", metavar="<command>")
 
+    hud_parser = argparse.ArgumentParser(add_help=False)
+    hud_choice = hud_parser.add_mutually_exclusive_group()
+    hud_choice.add_argument(
+        "--clean-hud", dest="hud", action="store_const", const="clean",
+        help="Install the clean HUD (default)",
+    )
+    hud_choice.add_argument(
+        "--bhs-hud", dest="hud", action="store_const", const="bhs",
+        help="Install the BHS HUD (disables the Medik health monitor mods in the SSS23.5 profile)",
+    )
+
     download_parser = argparse.ArgumentParser(add_help=False)
     download_parser.add_argument(
         "-a", "--archives-dir",
@@ -95,7 +106,7 @@ def cli_arguments():
 
     install_parser = sub.add_parser(
         "install",
-        parents=[common],
+        parents=[common, hud_parser],
         help="Download and install the modpack",
         description="Verify and install the ZONA modpack.",
     )
@@ -103,6 +114,18 @@ def cli_arguments():
         "--steam",
         action="store_true",
         help="Also add Mod Organizer 2 to the Steam library"
+    )
+    exes = read_toml_configs()["choices"]["exes"]
+    install_parser.add_argument(
+        "-e", "--modded-exes",
+        choices=exes["options"],
+        metavar="{" + ",".join(exes["options"]) + "}",
+        help=f"Which modded exes to install: regular, or mt (multithreaded test build) (default: {exes['default']})",
+    )
+    install_parser.add_argument(
+        "--mo2-stylesheet",
+        action="store_true",
+        help="Also install and activate the S.T.A.L.K.E.R. Mod Organizer 2 theme",
     )
 
     sub.add_parser(
@@ -136,11 +159,21 @@ def cli_arguments():
         help="Steam Proton prefix to use (typically a compatdata/<appid>/pfx folder; default: Steam-managed runtime path)",
     )
 
-    sub.add_parser(
+    mo2_command = sub.add_parser(
         "mo2",
-        parents=[mo2_parser],
+        parents=[mo2_parser, hud_parser],
         help="Install or validate just Mod Organizer 2 in the Proton prefix",
         description="Ensure the MO2 installation exists without re-running the full modpack install flow.",
+    )
+    mo2_command.add_argument(
+        "-a", "--archives-dir",
+        metavar="DIR",
+        help="Where archives are stored, for --clean-hud/--bhs-hud (default: archives_dir from config.toml)",
+    )
+    mo2_command.add_argument(
+        "--mo2-stylesheet",
+        action="store_true",
+        help="Install and activate the S.T.A.L.K.E.R. theme before launching Mod Organizer 2",
     )
 
     sub.add_parser(
@@ -150,9 +183,47 @@ def cli_arguments():
         description="Add ZONA's Mod Organizer 2 to the Steam library, forced to GE-Proton and using the installed prefix. Steam must be closed.",
     )
 
+    stylesheet_parser = argparse.ArgumentParser(add_help=False)
+    stylesheet_parser.add_argument(
+        "-i", "--install-dir",
+        metavar="DIR",
+        help="Where ZONA is installed (default: install_dir from config.toml)",
+    )
+    sub.add_parser(
+        "stylesheet",
+        parents=[stylesheet_parser],
+        help="Install and activate the S.T.A.L.K.E.R. theme in an existing Mod Organizer 2",
+        description="Copy the S.T.A.L.K.E.R. theme into Mod Organizer 2's stylesheets folder and make it the active style.",
+    )
+
+    sub.add_parser(
+        "keybinds",
+        help="Show the ZONA keybinds (opens both pictures in your image viewer)",
+        description="Open the ZONA keybind cheat sheets in the default image viewer.",
+    )
+
+    # -b also works after the command (zona mo2 -b). SUPPRESS: a subcommand without -b
+    # must not overwrite a -b given before the command.
+    for subparser in sub.choices.values():
+        subparser.add_argument(
+            "-b", "--no-banner", action="store_true", default=argparse.SUPPRESS,
+            help="Suppress the startup banner",
+        )
+
     args = parser.parse_args()
 
     if args.command is None:
         parser.print_help()
         raise SystemExit
+
+    # An empty path usually means an unset shell variable (-i "$Z" with Z unset): stop here
+    # instead of silently continuing with no folder.
+    path_flags = {
+        "install_dir": "-i/--install-dir", "archives_dir": "-a/--archives-dir",
+        "runners_dir": "-s/--steam-runners", "runner": "-r/--runner", "proton_prefix": "-p/--proton-prefix",
+    }
+    for dest, flag in path_flags.items():
+        value = getattr(args, dest, None)
+        if value is not None and not value.strip():
+            parser.error(f"{flag} was given an empty path (is the shell variable you used set?)")
     return args

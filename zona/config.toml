@@ -18,7 +18,7 @@ dll_overrides = "wineopenxr=d" # Wine DLL overrides for every Proton run (wineop
 
 # Chosen by the user at install time (flags or prompt)
 [choices]
-hud  = { default = "bhs", options = ["clean", "bhs"] }
+hud  = { default = "clean", options = ["clean", "bhs"] }  # --clean-hud / --bhs-hud
 exes = { default = "regular",    options = ["regular", "mt"] }
 
 # group/variant: only installed if the user picked that variant
@@ -52,7 +52,7 @@ dest = "{install_dir}/anomaly"
 id = "exes_mt"
 group = "exes"
 variant = "mt"
-filename = "STALKER-Anomaly-modded-exes-MT-TEST_2026.8.17.zip"
+filename = "STALKER-Anomaly-modded-exes-MT-TEST_2026.9.12.zip"
 url = "https://github.com/themrdemonized/xray-monolith/releases/download/2026.9.12/STALKER-Anomaly-modded-exes-MT-TEST_2026.9.12.zip"
 md5 = "8ecba8a163251f7b4757591908320155"
 dest = "{install_dir}/anomaly"
@@ -124,3 +124,10 @@ url = "https://github.com/gtair/filehost-1/releases/download/v1.38/bhs_hud.7z"
 md5 = "88544192fbf20e465fef7e7434e6cdb2"
 dest = "{install_dir}/anomaly"
 strip_components = 1
+# BHS HUD: these mods are disabled in this profile (re-enabled when the clean HUD is chosen).
+# Matched by name, so the list order (MO2 priority numbers) may change freely.
+disable_in_profile = "ZONA V1.38 SSS23.5 (High Graphics)"
+disable_mods = [
+  "New v1.38 Medik Health Monitor by sulikz Jeremussy Adapted by Drako",  # priority 344
+  "New v1.38 Medik Health Monitor Presetting",                            # priority 357
+]

@@ -23,7 +23,7 @@ def choose(title, options, default=0):
 
     Enter a number (default=1) >>>
     """
-    print(f"\n:: There are {len(options)} {title} available:")
+    print(f":: There are {len(options)} {title} available:")
     for number, option in enumerate(options, start=1):
         suffix = " (Default)" if number - 1 == default else ""
         print(f"   [{number}] {option}{suffix}")

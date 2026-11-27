@@ -4,8 +4,9 @@ from pathlib import Path
 from zona.core.log import logger
 
 
-def verify_archives(artifacts, ARCHIVES_DIR):
-    """Check every file against its checksum. Supports MD5 for normal artifacts and SHA512 sidecars for GE-Proton."""
+def verify_archives(artifacts, ARCHIVES_DIR, log=True):
+    """Check every file against its checksum. Supports MD5 for normal artifacts and SHA512 sidecars for GE-Proton.
+    With log=False nothing is printed; call log_item() later to print the result lines."""
     verify_ok = True
     checksum_results = {}
     for artifact in artifacts:
@@ -25,15 +26,26 @@ def verify_archives(artifacts, ARCHIVES_DIR):
             except FileNotFoundError:
                 status = None
             checksum_results[filename] = status
-            if not filename.lower().endswith(".sha512sum"):
-                label = expected or "sha512"
-                if not expected:
-                    actual = read_sha512_from_sidecar(file_path)
-                    label = f"sha512 {actual}" if actual else "sha512 sidecar"
-                log_result(filename, label, status)
+            if log:
+                log_item(item, ARCHIVES_DIR, status)
             if status is not True:
                 verify_ok = False
     return (verify_ok, checksum_results)
+
+
+def log_item(item, ARCHIVES_DIR, status):
+    """Log the checksum result line of one archive (sidecar .sha512sum files are not logged)."""
+    filename = item["filename"]
+    if filename.lower().endswith(".sha512sum"):
+        return
+    label = item.get("md5")
+    if not label:
+        try:
+            actual = read_sha512_from_sidecar(os.path.join(ARCHIVES_DIR, filename))
+        except FileNotFoundError:
+            actual = None
+        label = f"sha512 {actual}" if actual else "sha512 sidecar"
+    log_result(filename, label, status)
 
 
 def verify_md5(file_path, expected_md5):

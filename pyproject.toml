@@ -17,5 +17,6 @@ include = ["zona*"]
 [tool.setuptools.package-data]
 zona = [
     "config.toml",
-    "templates/*.ini"
+    "templates/*.ini",
+    "assets/**/*",
 ]

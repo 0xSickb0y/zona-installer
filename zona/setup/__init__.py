@@ -2,12 +2,8 @@ import time
 from pathlib import Path
 from zona.core import config
 from zona.core.log import logger
-from zona.download import download as download_module
+from zona.download import download
 from zona.setup import modpack, path_ops, runner, proton
-
-# Backwards-compatible import for internal code that still expects zona.setup.download
-# while the implementation lives under zona.download.
-download = download_module
 
 
 TOML_CONFIG = config.read_toml_configs()
@@ -54,7 +50,7 @@ def run(paths, skip_archive_cleanup=False):
 
         SELECTED_ARTIFACTS = [
             a for a in select_artifacts(
-                ARTIFACTS, TOML_CONFIG["choices"]
+                ARTIFACTS, TOML_CONFIG["choices"], hud=paths.get("hud"), exes=paths.get("exes")
             )
             if a["id"] != "ge_proton"
         ]

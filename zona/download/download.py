@@ -118,7 +118,8 @@ def ensure_archives(artifacts, ARCHIVES_DIR, retries=1):
             results[item["filename"]] = None
 
     if present:
-        print("Initiating MD5 Checksums")
+        logger.info(f"- [Archives already present at {ARCHIVES_DIR}]")
+        print("\nInitiating MD5 Checksums")
         _, checksum_results = hash_verification.verify_archives([{"parts": present}], ARCHIVES_DIR)
         results.update(checksum_results)
     corrupted = [i for i in present if results[i["filename"]] is not True]
@@ -154,6 +155,12 @@ def ensure_archives(artifacts, ARCHIVES_DIR, retries=1):
                 results.pop(item.get("previous_filename", item["filename"]), None)
                 results[item["filename"]] = future.result()
 
+        # The threads hash quietly; print all checksum lines in one block, in list order,
+        # now that the progress line is gone.
+        print("\nInitiating MD5 Checksums")
+        for item in to_fetch:
+            hash_verification.log_item(item, ARCHIVES_DIR, results[item["filename"]])
+
     failed = [name for name, status in results.items() if status is not True]
     if failed:
         logger.error(f"- [Unusable archives ({len(failed)})]")
@@ -179,7 +186,7 @@ def fetch_and_verify(item, ARCHIVES_DIR, retries=1):
             logger.error(f"- [Failed to fetch {item['filename']}: {error}]")
             status = None
         else:
-            _, checksum_results = hash_verification.verify_archives([item], ARCHIVES_DIR)
+            _, checksum_results = hash_verification.verify_archives([item], ARCHIVES_DIR, log=False)
             status = checksum_results[item["filename"]]
             if status is True:
                 return True
@@ -205,7 +212,6 @@ def download_file(url, filename, ARCHIVES_DIR, overwrite=False):
     if is_torrent_source(url):
         return download_torrent(url, filename, ARCHIVES_DIR)
 
-    print()
     logger.info(f"- [Fetching {url}]")
     with requests.get(url, stream=True, timeout=(10, 60)) as response:
         response.raise_for_status()

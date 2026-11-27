@@ -176,7 +176,7 @@ def get_proton(paths):
 
     proton = runners[0] if len(runners) == 1 else runners[choose_runner(runners)]
     paths["runner"] = proton.parent
-    logger.info(f"- [Using runner '{proton.parent.name}']")
+    # logger.info(f"- [Using runner '{proton.parent.name}']")
     return proton
 
 
@@ -339,11 +339,18 @@ def install_components(WINE_PREFIX_DIR, WINE_COMPONENTS, paths):
     return not failed
 
 
-def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, paths, suppress_output=False):
+DETACH_CHECK_SECONDS = 3  # a detached launch that dies this fast is reported as a failure
+
+
+def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, paths, suppress_output=False, detach=False):
     """Run a Windows executable through Proton with the app folder as cwd.
 
     `suppress_output` quiets Proton stdout/stderr when the caller doesn't want the runtime
     noise; `--verbose` can be added later without changing the function signature.
+
+    `detach` starts the program in its own session and returns without waiting for it, so zona
+    can exit and the program survives the terminal closing. Its output is discarded. Only an
+    immediate failure (Proton exiting within DETACH_CHECK_SECONDS) is reported.
     """
     proton = get_proton(paths)
     if proton is None:
@@ -351,16 +358,33 @@ def run_exe(exe_path, working_dir, WINE_PREFIX_DIR, paths, suppress_output=False
 
     exe_path = Path(exe_path)
     working_dir = Path(working_dir)
+    command = [str(proton), "run", str(exe_path)]
+    env = proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(paths["runners_dir"]).parent, dll_overrides=True)
 
     logger.info(f"- [Launching via {proton.parent.name}: {exe_path.name}]")
+
+    if detach:
+        try:
+            process = subprocess.Popen(
+                command, env=env, cwd=str(working_dir), start_new_session=True,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        except OSError as error:
+            logger.error(f"- [Could not run {proton.parent.name}: {error}]")
+            return False
+        try:
+            returncode = process.wait(timeout=DETACH_CHECK_SECONDS)
+        except subprocess.TimeoutExpired:
+            logger.info(f"- [{exe_path.name} started]")
+            return True
+        if returncode != 0:
+            logger.error(f"- [{exe_path.name} exited right away with code {returncode}]")
+            return False
+        return True
+
     extra = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL} if suppress_output else {}
     try:
-        result = subprocess.run(
-            [str(proton), "run", str(exe_path)],
-            env=proton_env(WINE_PREFIX_DIR, STEAM_ROOT=path_ops.find_steam_root() or Path(paths["runners_dir"]).parent, dll_overrides=True),
-            cwd=str(working_dir),
-            **extra,
-        )
+        result = subprocess.run(command, env=env, cwd=str(working_dir), **extra)
     except OSError as error:
         logger.error(f"- [Could not run {proton.parent.name}: {error}]")
         return False
